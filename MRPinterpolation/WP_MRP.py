@@ -1,7 +1,7 @@
 import numpy as np
 import networkx as nx
 
-from MRP_interpolator import MRP_interpolator
+from .MRP_interpolator import MRP_interpolator
 
 class WP_MRP(MRP_interpolator):
     """
@@ -29,15 +29,10 @@ class WP_MRP(MRP_interpolator):
         Train supplied prediction model on subsampled data or a training set
     """    
     
-    def __init__(self,grid,feature_grid,model):
-        # Feature grid is a 3d grid, where x and y correspond to grid, and the z axis contains feature
-        # vectors
-        
-        self.original_grid = grid.copy()
-        self.pred_grid = grid.copy()
+    def __init__(self,grid,feature_grid,model):       
+        super().__init__(grid)
         self.feature_grid = feature_grid.copy()
-        self.model = model
-        self.G = self.to_graph(grid)   
+        self.model = model 
     
             
     def run(self,iterations):

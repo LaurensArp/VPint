@@ -32,11 +32,11 @@ class MRP_interpolator:
     def __init__(self,grid):
         self.original_grid = grid.copy()
         self.pred_grid = grid.copy()
-        self.to_graph()
+        self.G = self.to_graph()
         
         
     def __str__(self):
-        return(self.grid)
+        return(str(self.pred_grid))
     
     
     def reset(self):
@@ -73,7 +73,7 @@ class MRP_interpolator:
                     G.add_edge(node_name,neighbour_name)
                     G.add_edge(neighbour_name,node_name)
 
-        self.G = G
+        return(G)
 
 
     def update_grid(self):

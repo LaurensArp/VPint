@@ -12,6 +12,8 @@ Minimal usage example:
 import numpy as np
 from sklearn.svm import SVR
 
+from MRPinterpolation import SD_MRP, WP_MRP
+
 # Create simple grid
 
 grid = np.zeros((5,5))
@@ -24,7 +26,7 @@ for i in range(0,len(grid)):
             
 # Run SD-MRP
 
-MRP = SD_MRP(grid,f_grid,SVR())
+MRP = SD_MRP(grid)
 MRP.find_gamma(100,0.5)
 pred_grid_SD = MRP.run(100)
 

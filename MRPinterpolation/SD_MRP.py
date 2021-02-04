@@ -1,7 +1,7 @@
 import numpy as np
 import networkx as nx
 
-from MRP_interpolator import MRP_interpolator
+from .MRP_interpolator import MRP_interpolator
 
 class SD_MRP(MRP_interpolator):
     """
@@ -28,9 +28,7 @@ class SD_MRP(MRP_interpolator):
     """
     
     def __init__(self,grid,gamma=0.9):
-        self.original_grid = grid.copy()
-        self.pred_grid = grid.copy()
-        self.G = self.to_graph(grid)
+        super().__init__(grid)
         self.gamma = gamma
     
     
@@ -45,7 +43,7 @@ class SD_MRP(MRP_interpolator):
         :param iterations: number of iterations used for the state value update function
         :returns: interpolated grid pred_grid
         """
-    
+
         for n in self.G.nodes(data=True):
             r = n[1]['r']
             c = n[1]['c']
@@ -79,7 +77,7 @@ class SD_MRP(MRP_interpolator):
         :param iterations: number of MRP interations used by the random search
         :returns: best found value for gamma
         """
-        
+
         if(ext != None):
             # Training set
             pass
@@ -93,15 +91,14 @@ class SD_MRP(MRP_interpolator):
                     if(not(np.isnan(sub_grid[i][j]))):
                         if(np.random.rand() < subsample_proportion):
                             sub_grid[i][j] = np.nan
-                                       
-            temp_MRP = SD_MRP(sub_grid)
-            
+                                                  
             best_loss = np.inf
             best_gamma = 0.9
             
             for ep in range(0,search_epochs):
                 # Random search for best gamma for search_epochs iterations
                 
+                temp_MRP = SD_MRP(sub_grid)
                 gamma = np.random.rand()
                 temp_MRP.set_gamma(gamma)
                 pred_grid = temp_MRP.run(iterations)
