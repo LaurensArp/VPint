@@ -7,7 +7,7 @@ setup(name='MRPinterpolation',
       author='Laurens Arp',
       author_email='l.r.arp@liacs.leidenuniv.nl',
       license='GPL-3.0',
-      packages=['MRPinterpolation'],
+      packages=['MRPinterpolation', 'utils'],
       install_requires=[
           'numpy',
           'networkx',

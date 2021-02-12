@@ -91,6 +91,38 @@ class SMRP:
         return(self.pred_grid)
         
         
+    def mean_absolute_error(self,true_grid,gridded=False):
+        """
+        Compute the mean absolute error of pred_grid given true_grid as ground truth
+        
+        :param true_grid: ground truth for all grid cells
+        :param gridded: optional Boolean specifying whether to return an error grid with the MAE
+        :returns: mean absolute error, optionally a tuple of MAE and per-cell error
+        """
+        height = self.pred_grid.shape[0]
+        width = self.pred_grid.shape[1]       
+        error_grid = np.zeros((height,width))
+        
+        e = 0
+        c = 0
+        for i in range(0,height):
+            for j in range(0,width):
+                if(np.isnan(self.original_grid[i][j])):
+                    err = abs(self.pred_grid[i][j] - true_grid[i][j])
+                    error_grid[i][j] = err
+                    e += err
+                    c += 1
+                else:
+                    error_grid[i][j] = np.nan
+        
+        mae = e/c
+        if(gridded):
+            result = (mae,error_grid)
+        else:
+            result = mae
+            
+        return(result)
+        
         
 class SD_SMRP(SMRP):
     """
@@ -117,6 +149,9 @@ class SD_SMRP(SMRP):
         
     find_gamma():
         Automatically determines the best gamma (using subsampling or a training set)
+        
+    compute_confidence():
+        compute an indication of uncertainty per pixel in pred_grid
     """
     
     def __init__(self,grid,gamma=0.9):
@@ -219,6 +254,25 @@ class SD_SMRP(SMRP):
         self.gamma = best_gamma
         return(best_gamma)
         
+    def compute_confidence(self,iterations=100):
+        """
+        Gives a confidence indication (float 0-1) for all cells in the grid by
+        running a sub-MRP interpolation process on a grid where the confidence
+        for known values is set to 1.
+        
+        :param iterations: number of iterations used for running the sub-MRP 
+        :returns: confidence indication per pixel
+        """
+        height = self.original_grid.shape[0]
+        width = self.original_grid.shape[1]
+        new_grid = np.zeros((height,width)) + 1
+        inds = np.isnan(self.original_grid)
+        new_grid[inds] = np.nan
+        
+        temp_MRP = SD_SMRP(new_grid,gamma=self.gamma)
+        confidence_grid = temp_MRP.run(iterations)
+        return(confidence_grid)
+        
         
         
 class WP_SMRP(SMRP):
@@ -245,6 +299,9 @@ class WP_SMRP(SMRP):
         
     train():
         Train supplied prediction model on subsampled data or a training set
+        
+    compute_confidence():
+        compute an indication of uncertainty per pixel in pred_grid
     """    
     
     def __init__(self,grid,feature_grid,model):       
@@ -356,3 +413,22 @@ class WP_SMRP(SMRP):
         # Train model
 
         self.model.fit(X,y)
+        
+    def compute_confidence(self,iterations=100):
+        """
+        Gives a confidence indication (float 0-1) for all cells in the grid by
+        running a sub-MRP interpolation process on a grid where the confidence
+        for known values is set to 1.
+        
+        :param iterations: number of iterations used for running the sub-MRP 
+        :returns: confidence indication per pixel
+        """
+        height = self.original_grid.shape[0]
+        width = self.original_grid.shape[1]
+        new_grid = np.zeros((height,width)) + 1
+        inds = np.isnan(self.original_grid)
+        new_grid[inds] = np.nan
+        
+        temp_MRP = WP_SMRP(new_grid,self.feature_grid,self.model)
+        confidence_grid = temp_MRP.run(iterations)
+        return(confidence_grid)
