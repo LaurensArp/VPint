@@ -8,5 +8,5 @@
 /*.egg-info
 
 # Testing notebooks
-/*.ipynb
-/.ipynb_checkpoints
+*.ipynb
+*.ipynb_checkpoints
