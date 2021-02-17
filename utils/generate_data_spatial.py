@@ -1,21 +1,19 @@
+"""Module for generating synthetic spatial data.
+"""
+
 import numpy as np
 
 def create_grid(grid_height,grid_width,global_mean,global_std,
                 stationary=True,nonstationary_points=None):
     """
-    Creates a 2D-grid of specified height and width using N(global_mean,global_std).
-    If stationary is True, the grid will be stationary, i.e., the mean and std
-    will be constant throughout the grid. If stationary is False, individual points
-    will be computed using the mean and std from the list of nonstationary_points.
+    Creates a 2D-grid of specified height and width using N(global_mean,global_std). If stationary is True, the grid will be stationary, i.e., the mean and std will be constant throughout the grid. If stationary is False, individual points will be computed using the mean and std from the list of nonstationary_points.
     
     :param grid_height: height of the grid to be generated
     :param grid_width: width of the grid to be generated
     :param global_mean: global mean for values in the entire grid
     :param global_std: global standard deviation for values in the entire grid
     :param stationary: Boolean denoting whether the grid should be stationary
-    :param nonstationary_points: list of nonstationary points, where individual
-    points are dictionaries with keys 'coords' = (y,x), 'mean' = local mean, and 
-    'std' = local standard deviation.
+    :param nonstationary_points: list of nonstationary points, where individual points are dictionaries with keys 'coords' = (y,x), 'mean' = local mean, and 'std' = local standard deviation.
     :returns: generated grid (no spatial autocorrelation)
     """
 
@@ -133,12 +131,9 @@ def update_grid(grid,ac_params,grid_height,grid_width,isotropy=True,anisotropy_a
     Apply an update to the specified grid to ensure spatial autocorrelation.
 
     :param grid: grid to work with
-    :param ac_params: dictionary of autocorrelation parameters, should include the keys "iterations" (number of times to call the update function), "autocorrelation" 
-    (autocorrelation coefficient), "static" (Boolean denoting whether AC is static
-    or not). If static==False, also include "mean" (mean AC) and "std" (AC std).
+    :param ac_params: dictionary of autocorrelation parameters, should include the keys "iterations" (number of times to call the update function), "autocorrelation" (autocorrelation coefficient), "static" (Boolean denoting whether AC is static or not). If static==False, also include "mean" (mean AC) and "std" (AC std).
     :param isotropy: Boolean indicating whether grid should be isotropic or not
-    :param anisotropy_autocorr: if isotropy==False, dictionary of directional AC
-    coefficients ("top", "down", "left" and "right")
+    :param anisotropy_autocorr: if isotropy==False, dictionary of directional AC coefficients ("top", "down", "left" and "right")
     :returns: grid updated with autocorrelation
     """
     grid2 = grid.copy()
@@ -200,11 +195,7 @@ def assign_features(base_grid,feature_params):
     Automatically assign features to a grid using a constrained uniform distribution.
 
     :param base_grid: 2D grid of target values
-    :param feature_params: dictionary containing feature generation parameters. Should
-    include "num" (number of features to generate/feature vector dimensionality), 
-    "max" (maximal value of the uniform distribution), "min" (minimal value of the
-    uniform distribution), "correlation" (correlation coefficient between random features
-    and the target variable).
+    :param feature_params: dictionary containing feature generation parameters. Should include "num" (number of features to generate/feature vector dimensionality), "max" (maximal value of the uniform distribution), "min" (minimal value of the uniform distribution), "correlation" (correlation coefficient between random features and the target variable).
     :returns: 3D feature grid
     """
 

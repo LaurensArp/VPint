@@ -1,3 +1,6 @@
+"""Module for MRP-based spatio-temporal interpolation.
+"""
+
 import numpy as np
 import networkx as nx
 import datetime

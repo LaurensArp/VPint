@@ -1,3 +1,6 @@
+"""Module for MRP-based spatial interpolation.
+"""
+
 import numpy as np
 import networkx as nx
 
