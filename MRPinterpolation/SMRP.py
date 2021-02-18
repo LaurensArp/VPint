@@ -45,10 +45,10 @@ class SMRP:
     def reset(self):
         """Return prediction grid and graph representation to their original form"""
         self.pred_grid = self.original_grid
-        self.G = self.to_graph(self.original_grid)
+        self.G = self.to_graph()
         
         
-    def to_graph(self,default_E=0):
+    def to_graph(self):
         """
         Converts a grid to graph form.
         
@@ -63,7 +63,11 @@ class SMRP:
             for j in range(0,grid_width):
                 val = self.original_grid[i][j]
                 node_name = "r" + str(i) + "c" + str(j)
-                G.add_node(node_name,y=val,E=default_E,r=i,c=j)
+                if(np.isnan(val)):
+                    E = np.nanmean(self.original_grid)
+                else:
+                    E = val
+                G.add_node(node_name,y=val,E=E,r=i,c=j)
 
                 # Connect to node above
                 if(i > 0):

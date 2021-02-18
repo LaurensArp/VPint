@@ -50,7 +50,7 @@ class STMRP:
             
         self.original_grid = new_grid
         self.pred_grid = new_grid
-        self.G = self.to_graph(new_grid)
+        self.G = self.to_graph()
            
     def dim_check(self,grid):
         """
@@ -129,7 +129,7 @@ class STMRP:
         
         return(grid)
         
-    def to_graph(self,grid,default_E=0):
+    def to_graph(self):
         """
         Converts a grid to graph form.
         
@@ -144,9 +144,13 @@ class STMRP:
         for i in range(0,grid_height):
             for j in range(0,grid_width):
                 for t in range(0,grid_depth):
-                    val = grid[i][j][t]
+                    val = self.original_grid[i][j][t]
+                    if(np.isnan(val)):
+                        E = np.nanmean(self.original_grid)
+                    else:
+                        E = val
                     node_name = "r" + str(i) + "c" + str(j) + "t" + str(t)
-                    G.add_node(node_name,y=val,E=default_E,r=i,c=j,t=t)
+                    G.add_node(node_name,y=val,E=E,r=i,c=j,t=t)
 
                     # Connect to node above
                     if(i > 0):
@@ -184,7 +188,7 @@ class STMRP:
     def reset(self):
         """Return prediction grid and graph representation to their original form"""
         self.pred_grid = self.original_grid.copy()
-        self.G = self.to_graph(self.original_grid)
+        self.G = self.to_graph()
                
     def __str__(self):
         return(str(self.pred_grid))
