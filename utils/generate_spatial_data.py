@@ -1,7 +1,9 @@
 """Module for generating synthetic spatial data.
 """
 
+import os
 import numpy as np
+import pandas as pd
 
 def create_grid(grid_height,grid_width,global_mean,global_std,
                 stationary=True,nonstationary_points=None):
@@ -126,71 +128,45 @@ def find_val(grid,cell_coords,neighbour,h,w):
         return False
 
     
-def update_grid(grid,ac_params,grid_height,grid_width,isotropy=True,anisotropy_autocorr=None):
+def update_grid(grid,params):
     """
     Apply an update to the specified grid to ensure spatial autocorrelation.
 
     :param grid: grid to work with
     :param ac_params: dictionary of autocorrelation parameters, should include the keys "iterations" (number of times to call the update function), "autocorrelation" (autocorrelation coefficient), "static" (Boolean denoting whether AC is static or not). If static==False, also include "mean" (mean AC) and "std" (AC std).
-    :param isotropy: Boolean indicating whether grid should be isotropic or not
-    :param anisotropy_autocorr: if isotropy==False, dictionary of directional AC coefficients ("top", "down", "left" and "right")
     :returns: grid updated with autocorrelation
     """
     grid2 = grid.copy()
     
-    for it in range(0,ac_params["iterations"]):
-        for i in range(0,grid_height):
-            for j in range(0,grid_width):
+    for it in range(0,params["param_ac_iterations"]):
+        for i in range(0,params["param_grid_height"]):
+            for j in range(0,params["param_grid_width"]):
                 val = grid2[i][j]
 
-                if(isotropy):
-                    # Find average neighbouring value
-                    neighbours = ["top","down","left","right"]
-                    avg_val = 0
-                    avg_count = 0
-                    for n in neighbours:
-                        n_val = find_val(grid2,(i,j),n,grid_height,grid_width)
-                        if(n_val):
-                            avg_val += n_val
-                            avg_count += 1
+                # Find average neighbouring value
+                neighbours = ["top","down","left","right"]
+                avg_val = 0
+                avg_count = 0
+                for n in neighbours:
+                    n_val = find_val(grid2,(i,j),n,params["param_grid_height"],params["param_grid_width"])
+                    if(n_val):
+                        avg_val += n_val
+                        avg_count += 1
 
-                    avg_val = avg_val / avg_count
+                avg_val = avg_val / avg_count
 
-                    # Apply autocorrelation update rule
+                # Apply autocorrelation update rule
 
-                    if(ac_params['static']):
-                        ac = ac_params['autocorrelation']
-                    else:
-                        ac = np.random.normal(ac_params['mean'],ac_params['std'])
-                    new_val = (1-ac) * val + ac * avg_val
-                    grid2[i][j] = new_val
-                    
+                if(params['param_ac_static']):
+                    ac = params['param_ac']
                 else:
-                    # Make influence proportional to coefficients
-                    
-                    if(not(anisotropy_autocorr)):
-                        print("No coefficients found")
-                        return(False)
-                    
-                    neighbours = ["top","down","left","right"]
-                    avg_val = 0                   
-                    total_weight = anisotropy_autocorr["top"] + anisotropy_autocorr["down"] + \
-                                        anisotropy_autocorr["left"] + anisotropy_autocorr["right"]
-                    
-                    for n in neighbours:
-                        n_val = find_val(grid2,(i,j),n,grid_height,grid_width)
-                        if(n_val):
-                            weight = anisotropy_autocorr[n] / total_weight
-                            avg_val += weight * n_val
-
-                    # Apply autocorrelation update rule
-
-                    new_val = (1-autocorrelation) * val + autocorrelation * avg_val
-                    grid2[i][j] = new_val
+                    ac = np.random.normal(params['param_ac_mean'],params['param_ac_std'])
+                new_val = (1-ac) * val + ac * avg_val
+                grid2[i][j] = new_val
                         
     return(grid2)
     
-def assign_features(base_grid,feature_params):
+def assign_features(base_grid,params):
     """
     Automatically assign features to a grid using a constrained uniform distribution.
 
@@ -202,13 +178,15 @@ def assign_features(base_grid,feature_params):
     # Add num_features random features, corresponding to label by factor correlation
     # If correlation=1, equal to passing label as feature. If 0, completely random
     
-    num_features = feature_params['num']
-    feature_min = feature_params['min']
-    feature_max = feature_params['max']
-    correlation = feature_params['correlation']
+    num_features = params['param_num_features']
+    feature_min = params['param_feature_min']
+    feature_max = params['param_feature_max']
+    correlation = params['param_feature_correlation']
     
     height = base_grid.shape[0]
     width = base_grid.shape[1]
+    
+    max_val = np.max(base_grid)
     
     feature_grid = np.zeros((height,width,num_features))
     
@@ -217,29 +195,69 @@ def assign_features(base_grid,feature_params):
             A = np.zeros(num_features)
             for k in range(0,num_features):
                 feature_base = np.random.uniform(low=feature_min,high=feature_max)
-                feature = correlation*base_grid[i][j] + (1-correlation)*feature_base
+                # Weigh by correlation param, normalise with max
+                feature = correlation*(base_grid[i][j]/max_val) + (1-correlation)*(feature_base/feature_max)
                 A[k] = feature
         
             feature_grid[i,j,:] = A
             
     return(feature_grid)
-            
-def hide_values_uniform(base_grid,probability):
-    """
-    Return a new version of the supplied grid where values are
-    probabilistically (uniform) hidden.
 
-    :param base_grid: 2D grid of target values
-    :param probability: probability to hide an individual cell
-    :returns: copy of base_grid with some artificially hidden cells
+def generate_data(user_params=None,generate_features=False,default_params_file="default_params.csv"):
     """
-    height = base_grid.shape[0]
-    width = base_grid.shape[1]
-    new_grid = np.zeros((height,width))
-    for i in range(0,height):
-        for j in range(0,width):
-            if(np.random.rand() < probability):
-                new_grid[i][j] = np.nan
-            else:
-                new_grid[i][j] = base_grid[i][j]
-    return(new_grid)
+    Create grid with user-specified params (dict) where present,
+    default values otherwise
+    
+    :param user_params: dictionary of user-specified parameters and their values. See default_params.csv for possible parameters.
+    :param generate_features: boolean specifying whether to generate a feature grid
+    :param default_params_file: path to the .csv containing default parameter values
+    """
+    
+    # Read default parameters
+    params = {}
+    rel_path = os.path.join(os.path.dirname(__file__),default_params_file)
+    df = pd.read_csv(rel_path)
+    for i,r in df.iterrows():
+        name = r['name']
+        dtype = r['type']
+        raw_val = r['value']
+        if(dtype == 'boolean'):
+            val = bool(raw_val)
+        elif(dtype == 'float'):
+            val = float(raw_val)
+        else:
+            val = int(raw_val)
+        params[name] = val
+        
+    # Read user parameters
+    if(user_params != None):
+        for k,v in user_params.items():
+            params[k] = v
+            
+    # Generate data
+    nonstationary_points = generate_nonstationary_points(
+        params["param_nonstationarity_num_points"],
+        params["param_grid_height"],
+        params["param_grid_width"],
+        params["param_nonstationary_min_mean"],
+        params["param_nonstationary_max_mean"]
+    )
+    grid = create_grid(
+        params["param_grid_height"],
+        params["param_grid_width"],
+        params["param_global_mean"],
+        params["param_global_std"],
+        stationary=params["param_stationary"],
+        nonstationary_points=nonstationary_points
+    )
+    grid = update_grid(grid,params)
+    
+    if(generate_features):
+        feature_grid = assign_features(grid,params)
+        return(grid,feature_grid)
+    else:
+        return(grid)
+
+    
+    
+            

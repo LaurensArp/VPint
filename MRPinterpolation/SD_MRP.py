@@ -37,8 +37,8 @@ class SD_SMRP(SMRP):
         compute an indication of uncertainty per pixel in pred_grid
     """
     
-    def __init__(self,grid,gamma=0.9):
-        super().__init__(grid)
+    def __init__(self,grid,gamma=0.9,init_strategy='zero'):
+        super().__init__(grid,init_strategy=init_strategy)
         self.gamma = gamma
     
     
@@ -58,26 +58,27 @@ class SD_SMRP(SMRP):
         :param iterations: number of iterations used for the state value update function
         :returns: interpolated grid pred_grid
         """
+        for it in range(0,iterations):
+            G = self.G.copy()
+            for n in self.G.nodes(data=True):
+                r = n[1]['r']
+                c = n[1]['c']
+                y = n[1]['y']
+                E = n[1]['E']
 
-        for n in self.G.nodes(data=True):
-            r = n[1]['r']
-            c = n[1]['c']
-            y = n[1]['y']
-            E = n[1]['E']
-            
-            if(np.isnan(y)):
-                v_a_sum = 0
-                for n1,n2,w in self.G.in_edges(n[0],data=True):
-                    destination_node = self.G.nodes(data=True)[n1]
-                    E_dest = destination_node['E']
-                    v_a = self.gamma * E_dest
-                    v_a_sum += v_a
-                E_new = v_a_sum / len(self.G.in_edges(n[0]))
-                nx.set_node_attributes(self.G,{n[0]:E_new},'E')
+                if(np.isnan(y)):
+                    v_a_sum = 0
+                    for n1,n2,w in self.G.in_edges(n[0],data=True):
+                        destination_node = self.G.nodes(data=True)[n1]
+                        E_dest = destination_node['E']
+                        v_a = self.gamma * E_dest
+                        v_a_sum += v_a
+                    E_new = v_a_sum / len(self.G.in_edges(n[0]))
+                    nx.set_node_attributes(G,{n[0]:E_new},'E')
 
-            else:
-                nx.set_node_attributes(self.G,{n[0]:y},'E')
-        
+                else:
+                    nx.set_node_attributes(G,{n[0]:y},'E')
+            self.G = G
         self.update_grid()
         return(self.pred_grid)
     
@@ -267,31 +268,34 @@ class SD_STMRP(STMRP):
         :param iterations: number of iterations used for the state value update function
         :returns: interpolated grid pred_grid
         """
-        for n in self.G.nodes(data=True):
-            r = n[1]['r']
-            c = n[1]['c']
-            y = n[1]['y']
-            E = n[1]['E']
-            
-            if(np.isnan(y)):
-                v_a_sum = 0
-                t = n[1]['t']
-                for n1,n2,w in self.G.in_edges(n[0],data=True):
-                    destination_node = self.G.nodes(data=True)[n1]
-                    E_dest = destination_node['E']
-                    t_dest = destination_node['t']
-                    if(t_dest != t):
-                        discount = self.tau
-                    else:
-                        discount = self.gamma
-                    v_a = discount * E_dest
-                    v_a_sum += v_a
-                E_new = v_a_sum / len(self.G.in_edges(n[0]))
-                nx.set_node_attributes(self.G,{n[0]:E_new},'E')
+        for it in range(0,iterations):
+            G = self.G.copy()
+            for n in self.G.nodes(data=True):
+                r = n[1]['r']
+                c = n[1]['c']
+                y = n[1]['y']
+                E = n[1]['E']
 
-            else:
-                nx.set_node_attributes(self.G,{n[0]:y},'E')
-        
+                if(np.isnan(y)):
+                    v_a_sum = 0
+                    t = n[1]['t']
+                    for n1,n2,w in self.G.in_edges(n[0],data=True):
+                        destination_node = self.G.nodes(data=True)[n1]
+                        E_dest = destination_node['E']
+                        t_dest = destination_node['t']
+                        if(t_dest != t):
+                            discount = self.tau
+                        else:
+                            discount = self.gamma
+                        v_a = discount * E_dest
+                        v_a_sum += v_a
+                    E_new = v_a_sum / len(self.G.in_edges(n[0]))
+                    nx.set_node_attributes(G,{n[0]:E_new},'E')
+
+                else:
+                    nx.set_node_attributes(G,{n[0]:y},'E')
+                
+            self.G = G
         self.update_grid()
         return(self.pred_grid)
         

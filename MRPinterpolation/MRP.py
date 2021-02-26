@@ -29,10 +29,10 @@ class MRP:
         Computes the mean absolute error of pred_grid compared to a given ground truth grid
     """
     
-    def __init__(self,grid):
+    def __init__(self,grid,init_strategy='zero'):
         self.original_grid = grid.copy()
         self.dims = len(grid.shape)
-        self.init_pred_grid()
+        self.init_pred_grid(init_strategy=init_strategy)
         
         
     def __str__(self):
@@ -45,23 +45,56 @@ class MRP:
         self.G = self.to_graph()
           
     
-    def init_pred_grid(self):
-        """Initialise pred_grid with mean values as initial values for missing cells"""
+    def init_pred_grid(self,init_strategy='zero'):
+        """Initialise pred_grid with mean values as initial values for missing cells
+        
+        :param init_strategy: method for initialising unknown values. Options: 'zero', 'random', 'mean'"""
+        
         self.pred_grid = self.original_grid.copy()
         height = self.pred_grid.shape[0]
-        width = self.pred_grid.shape[1]
+        if(self.dims > 1):
+            width = self.pred_grid.shape[1]
         if(self.dims == 3):
             depth = self.pred_grid.shape[2]
-        mean = np.nanmean(self.original_grid)
+
         for i in range(0,height):
-            for j in range(0,width):
-                if(self.dims == 3):
-                    for t in range(0,depth):
-                        if(np.isnan(self.pred_grid[i,j,t])):
-                            self.pred_grid[i,j,t] = mean
-                else:
-                    if(np.isnan(self.pred_grid[i,j])):
-                        self.pred_grid[i,j] = mean
+            if(self.dims > 1):
+                for j in range(0,width):
+                    if(self.dims == 3):
+                        # Spatio-temporal case
+                        for t in range(0,depth):
+                            if(np.isnan(self.pred_grid[i,j,t])):
+                                initval = 0
+                                if(init_strategy == "random"):
+                                    mean = np.nanmean(self.original_grid)
+                                    std = np.nanstd(self.original_grid)
+                                    initval = np.random.normal(mean,std)
+                                elif(init_strategy == "mean"):
+                                    initval = np.nanmean(self.original_grid)
+                                self.pred_grid[i,j,t] = initval
+                    else:
+                        # Spatial case
+                        if(np.isnan(self.pred_grid[i,j])):
+                            initval = 0
+                            if(init_strategy == "random"):
+                                mean = np.nanmean(self.original_grid)
+                                std = np.nanstd(self.original_grid)
+                                initval = np.random.normal(mean,std)
+                            elif(init_strategy == "mean"):
+                                initval = np.nanmean(self.original_grid)
+                            self.pred_grid[i,j] = initval
+                        
+            else:
+                # Temporal case
+                if(np.isnan(self.pred_grid[i])):
+                    initval = 0
+                    if(init_strategy == "random"):
+                        mean = np.nanmean(self.original_grid)
+                        std = np.nanstd(self.original_grid)
+                        initval = np.random.normal(mean,std)
+                    elif(init_strategy == "mean"):
+                        initval = np.nanmean(self.original_grid)
+                    self.pred_grid[i] = initval
              
                
     def get_pred_grid(self):
@@ -91,6 +124,7 @@ class MRP:
         for i in range(0,height):
             for j in range(0,width):
                 if(self.dims == 3):
+                    # Spatio-temporal
                     for t in range(0,depth):
                         if(np.isnan(self.original_grid[i][j][t])):
                             err = abs(self.pred_grid[i][j][t] - true_grid[i][j][t])
@@ -100,6 +134,7 @@ class MRP:
                         else:
                             error_grid[i][j][t] = np.nan
                 else:
+                    # Spatial/temporal
                     if(np.isnan(self.original_grid[i][j])):
                         err = abs(self.pred_grid[i][j] - true_grid[i][j])
                         error_grid[i][j] = err
@@ -107,7 +142,6 @@ class MRP:
                         c += 1
                     else:
                         error_grid[i][j] = np.nan
-        
         mae = e/c
         if(gridded):
             result = (mae,error_grid)
@@ -145,8 +179,8 @@ class SMRP(MRP):
         Returns pred_grid
     """
     
-    def __init__(self,grid):
-        super().__init__(grid)
+    def __init__(self,grid,init_strategy='zero'):
+        super().__init__(grid,init_strategy=init_strategy)
         self.G = self.to_graph()
         
         
@@ -194,7 +228,6 @@ class SMRP(MRP):
             self.pred_grid[r][c] = E
             
             
-            
 class STMRP(MRP):
     """
     Basic class implementing the basic spatio-temporal framework for 
@@ -232,13 +265,13 @@ class STMRP(MRP):
         Returns pred_grid
     """
 
-    def __init__(self,data,auto_timesteps):       
+    def __init__(self,data,auto_timesteps,init_strategy='zero'):       
         if(auto_timesteps):
             new_grid = self.set_timesteps(data.copy())
         else:
             new_grid = self.dim_check(data.copy())
             
-        super().__init__(new_grid)
+        super().__init__(new_grid,init_strategy=init_strategy)
         self.G = self.to_graph()
            
     def dim_check(self,grid):
