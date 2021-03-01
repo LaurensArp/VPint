@@ -51,21 +51,28 @@ class SD_SMRP(SMRP):
         self.gamma = gamma
     
             
-    def run(self,iterations):
+    def run(self,iterations=None,termination_threshold=1e-4):
         """
         Runs SD-SMRP for the specified number of iterations.
         
-        :param iterations: number of iterations used for the state value update function
+        :param iterations: optional number of iterations used for the state value update function. If not specified, terminate once the maximal difference of a cell update dips below termination_threshold
+        :param termination_threshold: optional parameter specifying the threshold for auto-termination
         :returns: interpolated grid pred_grid
         """
-        for it in range(0,iterations):
+        it = 0
+        while True:
+            delta = np.zeros(len(self.G.nodes))
             G = self.G.copy()
+            c = 0
+            
+            # Iterate over nodes
             for n in self.G.nodes(data=True):
                 r = n[1]['r']
                 c = n[1]['c']
                 y = n[1]['y']
                 E = n[1]['E']
 
+                # Interpolate missing nodes
                 if(np.isnan(y)):
                     v_a_sum = 0
                     for n1,n2,w in self.G.in_edges(n[0],data=True):
@@ -75,10 +82,28 @@ class SD_SMRP(SMRP):
                         v_a_sum += v_a
                     E_new = v_a_sum / len(self.G.in_edges(n[0]))
                     nx.set_node_attributes(G,{n[0]:E_new},'E')
-
+                    
+                    # Compute delta
+                    delta[c] = abs(E - E_new)
+                    c += 1
                 else:
+                    # Keep known values
                     nx.set_node_attributes(G,{n[0]:y},'E')
+                    
+                
+            # Apply update
             self.G = G
+            it += 1
+            
+            # Check termination conditions
+            if(iterations != None):
+                if(it >= iterations):
+                    break
+            else:
+                if(np.max(delta) < termination_threshold):
+                    break
+            
+        # Finalise
         self.update_grid()
         return(self.pred_grid)
     
@@ -132,14 +157,13 @@ class SD_SMRP(SMRP):
         return(np.sum(vals))
         
         
-    def find_gamma(self,search_epochs,subsample_proportion,iterations=100,ext=None):
+    def find_gamma(self,search_epochs,subsample_proportion,ext=None):
         """
         Automatically sets gamma to the best found value. Currently
         only supports random search.
         
         :param search_epochs: number of epochs used by the random search
         :param subsample_proportion: proportion of training data used to compute errors
-        :param iterations: number of MRP interations used by the random search
         :returns: best found value for gamma
         """
 
@@ -166,7 +190,7 @@ class SD_SMRP(SMRP):
                 temp_MRP = SD_SMRP(sub_grid)
                 gamma = np.random.rand()
                 temp_MRP.set_gamma(gamma)
-                pred_grid = temp_MRP.run(iterations)
+                pred_grid = temp_MRP.run()
                 
                 # Compute MAE of subsampled predictions
                 err = 0
@@ -261,15 +285,19 @@ class SD_STMRP(STMRP):
         """
         self.tau = tau
             
-    def run(self,iterations):
+    def run(self,iterations=None,termination_threshold=1e-4):
         """
         Runs SD-STMRP for the specified number of iterations.
         
         :param iterations: number of iterations used for the state value update function
         :returns: interpolated grid pred_grid
         """
-        for it in range(0,iterations):
+        it = 0
+        while True:
+            delta = np.zeros(len(self.G.nodes))
             G = self.G.copy()
+            c = 0
+            
             for n in self.G.nodes(data=True):
                 r = n[1]['r']
                 c = n[1]['c']
@@ -291,15 +319,31 @@ class SD_STMRP(STMRP):
                         v_a_sum += v_a
                     E_new = v_a_sum / len(self.G.in_edges(n[0]))
                     nx.set_node_attributes(G,{n[0]:E_new},'E')
+                    
+                    # Compute delta
+                    delta[c] = abs(E - E_new)
+                    c += 1
 
                 else:
                     nx.set_node_attributes(G,{n[0]:y},'E')
                 
+            # Apply update
             self.G = G
+            it += 1
+            
+            # Check termination conditions
+            if(iterations != None):
+                if(it >= iterations):
+                    break
+            else:
+                if(np.max(delta) < termination_threshold):
+                    break
+            
+        # Finalise
         self.update_grid()
         return(self.pred_grid)
         
-    def find_discounts(self,search_epochs,subsample_proportion,iterations=100,ext=None):
+    def find_discounts(self,search_epochs,subsample_proportion,ext=None):
         """
         Automatically sets gamma and tau to the best found value. Currently
         only supports random search.
@@ -342,7 +386,7 @@ class SD_STMRP(STMRP):
                 tau = np.random.rand()
                 temp_MRP.set_gamma(gamma)
                 temp_MRP.set_tau(tau)
-                pred_grid = temp_MRP.run(iterations)
+                pred_grid = temp_MRP.run()
                 
                 # Compute MAE of subsampled predictions
                 err = 0

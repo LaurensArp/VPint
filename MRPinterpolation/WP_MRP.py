@@ -44,7 +44,7 @@ class WP_SMRP(SMRP):
         self.min_gamma = min_gamma
     
             
-    def run(self,iterations,method='predict'):
+    def run(self,iterations=None,termination_threshold=1e-4,method='predict'):
         """
         Runs WP-SMRP for the specified number of iterations.
         
@@ -52,8 +52,12 @@ class WP_SMRP(SMRP):
         :param method: method for computing weights. Options: "predict" (using self.model), "cosine_similarity" (based on feature similarity), "exact" (compute average weight exactly for features)
         :returns: interpolated grid pred_grid
         """
-        for it in range(0,iterations):
+        it = 0
+        while True:
+            delta = np.zeros(len(self.G.nodes))
             G = self.G.copy()
+            c = 0
+            
             for n in self.G.nodes(data=True):
                 r = n[1]['r']
                 c = n[1]['c']
@@ -83,7 +87,7 @@ class WP_SMRP(SMRP):
                         elif(method == "exact"):
                             f1_temp = f1.copy()
                             f1_temp[f1_temp == 0] = 0.01
-                            gamma = np.mean(f2 / f1_temp)
+                            gamma = np.mean(f2 / f1_temp) 
                         else:
                             print("Invalid method")
                             intentionalcrash # TODO: start throwing proper exceptions...
@@ -92,11 +96,27 @@ class WP_SMRP(SMRP):
                         v_a_sum += v_a
                     E_new = v_a_sum / len(self.G.in_edges(n[0]))
                     nx.set_node_attributes(G,{n[0]:E_new},'E')
+                    
+                    # Compute delta
+                    delta[c] = abs(E - E_new)
+                    c += 1
 
                 else:
                     nx.set_node_attributes(G,{n[0]:y},'E')
+                    
+            # Apply update
             self.G = G
-        
+            it += 1
+            
+            # Check termination conditions
+            if(iterations != None):
+                if(it >= iterations):
+                    break
+            else:
+                if(np.max(delta) < termination_threshold):
+                    break
+            
+        # Finalise
         self.update_grid()
         return(self.pred_grid)
        
@@ -229,8 +249,12 @@ class WP_STMRP(STMRP):
         :param iterations: number of iterations used for the state value update function
         :returns: interpolated grid pred_grid
         """
-        for it in range(0,iterations):
+        it = 0
+        while True:
+            delta = np.zeros(len(self.G.nodes))
             G = self.G.copy()
+            c = 0
+            
             for n in self.G.nodes(data=True):
                 r = n[1]['r']
                 c = n[1]['c']
@@ -261,11 +285,27 @@ class WP_STMRP(STMRP):
                         v_a_sum += v_a
                     E_new = v_a_sum / len(self.G.in_edges(n[0]))
                     nx.set_node_attributes(G,{n[0]:E_new},'E')
+                    
+                    # Compute delta
+                    delta[c] = abs(E - E_new)
+                    c += 1
 
                 else:
                     nx.set_node_attributes(G,{n[0]:y},'E')
                     
+            # Apply update
             self.G = G
+            it += 1
+            
+            # Check termination conditions
+            if(iterations != None):
+                if(it >= iterations):
+                    break
+            else:
+                if(np.max(delta) < termination_threshold):
+                    break
+            
+        # Finalise
         self.update_grid()
         return(self.pred_grid)
     
