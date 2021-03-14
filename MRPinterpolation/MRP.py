@@ -150,6 +150,48 @@ class MRP:
             
         return(result)
     
+    
+    def r_squared(self,true_grid):
+        """
+        Compute the r^2 of pred_grid given true_grid as ground truth
+        
+        :param true_grid: ground truth for all grid cells
+        :returns: r^2
+        """
+        height = self.pred_grid.shape[0]
+        width = self.pred_grid.shape[1]
+        if(self.dims == 3):
+            depth = self.pred_grid.shape[2]
+        
+        m = np.mean(true_grid)
+        
+        res = 0
+        tot = 0
+
+        for i in range(0,height):
+            for j in range(0,width):
+                if(self.dims == 3):
+                    # Spatio-temporal
+                    for t in range(0,depth):
+                        if(np.isnan(self.original_grid[i][j][t])):
+                            resval = (true_grid[i][j][t] - self.pred_grid[i][j][t])**2
+                            totval = (true_grid[i][j][t] - m)**2
+
+                            res += resval
+                            tot += totval
+
+                else:
+                    # Spatial/temporal
+                    if(np.isnan(self.original_grid[i][j])):
+                        resval = (true_grid[i][j] - self.pred_grid[i][j])**2
+                        totval = (true_grid[i][j] - m)**2
+
+                        res += resval
+                        tot += totval
+        r_squared = 1 - (res/tot)
+            
+        return(r_squared)
+    
 
 class SMRP(MRP):
     """
