@@ -126,7 +126,6 @@ class SD_SMRP(SMRP):
         height = self.pred_grid.shape[0]
         width = self.pred_grid.shape[1]
         
-        #TODO: verify that -1 is correct
         h = height - 1
         w = width - 1
         
@@ -202,7 +201,7 @@ class SD_SMRP(SMRP):
         return(self.pred_grid)
         
         
-    def find_gamma(self,search_epochs,subsample_proportion,ext=None):
+    def find_gamma(self,search_epochs,subsample_proportion,sub_iterations=100,ext=None):
         """
         Automatically sets gamma to the best found value. Currently
         only supports random search.
@@ -235,7 +234,7 @@ class SD_SMRP(SMRP):
                 temp_MRP = SD_SMRP(sub_grid)
                 gamma = np.random.rand()
                 temp_MRP.set_gamma(gamma)
-                pred_grid = temp_MRP.run()
+                pred_grid = temp_MRP.run(sub_iterations)
                 
                 # Compute MAE of subsampled predictions
                 err = 0
