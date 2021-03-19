@@ -176,7 +176,6 @@ class WP_SMRP(SMRP):
             intentionalcrash # TODO: start throwing proper exceptions...
         return(gamma)
         
-        
     def run_old(self,iterations=None,termination_threshold=1e-4,method='predict'):
         """
         Runs WP-SMRP for the specified number of iterations.
@@ -366,16 +365,198 @@ class WP_STMRP(STMRP):
     train():
         Train supplied prediction model on subsampled data or a training set
     """    
-    def __init__(self,grid,feature_grid,model,auto_timesteps=False):
+    def __init__(self,grid,feature_grid,model,auto_timesteps=False,max_gamma=np.inf,min_gamma=0):
         # Feature grid is a 3d grid, where x and y correspond to grid, and the z axis contains feature
         # vectors
         
         super(WP_STMRP, self).__init__(grid,auto_timesteps)
         self.feature_grid = feature_grid.copy().astype(float)
-        self.model = model  
+        self.model = model
+        self.max_gamma = max_gamma
+        self.min_gamma = min_gamma
+        
+        
+    def run(self,iterations,method='predict'):
+        """
+        Runs WP-STMRP for the specified number of iterations. Creates a 4D (h,w,t,6) tensor val_grid, where the 4th axis corresponds to a neighbour of each cell, and a 4D (h,w,t,6) weight tensor weight_grid, where the 4th axis corresponds to the weights of every neighbour in val_grid's 4th axis. The x and y axes of both tensors are stacked into 2D (h*w*t,6) matrices (one of which is transposed), after which the dot product is taken between both matrices, resulting in a (h*w,h*w) matrix. As we are only interested in multiplying the same row numbers with the same column numbers, we take the diagonal entries of the computed matrix to obtain a 1D (h*w*t) vector of updated values (we use numpy's einsum to do this efficiently, without wasting computation on extra dot products). This vector is then divided element-wise by a vector (flattened 3D grid) counting the number of neighbours of each cell, and we use the object's original_grid to replace wrongly updated known values to their original true values. We finally reshape this vector back to the original 3D pred_grid shape of (h,w,t).
+        
+        :param iterations: number of iterations used for the state value update function. If not specified, terminate once the maximal difference of a cell update dips below termination_threshold
+        :returns: interpolated grid pred_grid
+        """
+
+        # This one would also work for WP-MRP
+        
+        # Setup all this once
+        
+        height = self.pred_grid.shape[0]
+        width = self.pred_grid.shape[1]
+        depth = self.pred_grid.shape[2]
+        
+        h = height - 1
+        w = width - 1
+        d = depth - 1
+        
+        neighbour_count_grid = np.zeros((height,width,depth))
+        weight_grid = np.zeros((height,width,depth,6))
+        val_grid = np.zeros((height,width,depth,6))
+        
+        # Compute weight grid once (vectorise at some point if possible)
+        
+        for i in range(0,height):
+            for j in range(0,width):
+                for t in range(0,depth):
+                    vec = np.zeros(6)
+                    f2 = self.feature_grid[i,j,:]
+                    if(i > 0):
+                        # Top
+                        f1 = self.feature_grid[i-1,j,:]
+                        f3 = np.array([0])
+                        f = np.concatenate((f1,f2,f3))
+                        vec[0] = self.predict_weight(f,method)
+                    if(j < w):
+                        # Right
+                        f1 = self.feature_grid[i,j+1,:]
+                        f3 = np.array([0])
+                        f = np.concatenate((f1,f2,f3))
+                        vec[1] = self.predict_weight(f,method)
+                    if(i < h):
+                        # Bottom
+                        f1 = self.feature_grid[i+1,j,:]
+                        f3 = np.array([0])
+                        f = np.concatenate((f1,f2,f3))
+                        vec[2] = self.predict_weight(f,method)
+                    if(j > 0):
+                        # Left
+                        f1 = self.feature_grid[i,j-1,:]
+                        f3 = np.array([0])
+                        f = np.concatenate((f1,f2,f3))
+                        vec[3] = self.predict_weight(f,method)
+                    if(t > 0):
+                        # Before
+                        f1 = self.feature_grid[i,j,:]
+                        f3 = np.array([-1])
+                        f = np.concatenate((f1,f2,f3))
+                        vec[4] = self.predict_weight(f,method)
+                    if(t < d):
+                        # After
+                        f1 = self.feature_grid[i,j,:]
+                        f3 = np.array([1])
+                        f = np.concatenate((f1,f2,f3))
+                        vec[5] = self.predict_weight(f,method)
+
+                    weight_grid[i,j,t,:] = vec
+        
+        weight_matrix = weight_grid.reshape((height*width*depth,6)).transpose()
+        
+        # Set neighbour count and weight grids
+        
+        for i in range(0,height):
+            for j in range(0,width):
+                for t in range(0,depth):
+                    if(i > 0 and i < height-1): 
+                        if(j > 0 and j < width-1):
+                            if(t > 0 and t < depth-1):
+                                # Middle (s), middle (t)
+                                neighbour_count_grid[i,j,t] = 6
+                            else:
+                                # Middle (s), edge (t)
+                                neighbour_count_grid[i,j,t] = 5
+                        elif(j == 0 or j == width-1):
+                            if(t > 0 and t < depth-1):
+                                # L/R edge (s), middle (t)
+                                neighbour_count_grid[i,j,t] = 5
+                            else:
+                                # L/R edge (s), edge (t)
+                                neighbour_count_grid[i,j,t] = 4
+                    elif(i == 0 or i == height-1):
+                        if(j > 0 and j < width-1):
+                            if(t > 0 and t < depth-1):
+                                # T/B edge (s), middle (t)
+                                neighbour_count_grid[i,j,t] = 5
+                            else:
+                                # T/B edge (s), edge (t)
+                                neighbour_count_grid[i,j,t] = 4
+
+                        elif(j == 0 or j == width-1):
+                            if(t > 0 and t < depth-1):
+                                # Corner (s), middle (t)
+                                neighbour_count_grid[i,j,t] = 4
+                            else:
+                                # Corner (s), edge (t)
+                                neighbour_count_grid[i,j,t] = 3
+
+        
+        neighbour_count_vec = neighbour_count_grid.reshape(width*height*depth) # TODO: verify that this is correct
+        
+        # Main loop
+        
+        for it in range(0,iterations):
+            # Set val_grid
+                      
+            # Up
+            val_grid[1:h+1,:,:,0] = self.pred_grid[0:h,:,:] # +1 because it's non-inclusive (0:10 means 0-9)
+            val_grid[0,:,:,0] = np.zeros((width,depth))
+            
+            # Right
+            val_grid[:,0:w,:,1] = self.pred_grid[:,1:w+1,:]
+            val_grid[:,w,:,1] = np.zeros((height,depth))
+            
+            # Down
+            val_grid[0:h,:,:,2] = self.pred_grid[1:h+1,:,:]
+            val_grid[h,:,:,2] = np.zeros((width,depth))
+            
+            # Left
+            val_grid[:,1:w+1,:,3] = self.pred_grid[:,0:w,:]
+            val_grid[:,0,:,3] = np.zeros((height,depth)) 
+            
+            # Next time step
+            val_grid[:,:,0:d,4] = self.pred_grid[:,:,1:d+1]
+            val_grid[:,:,d,4] = np.zeros((height,width)) 
+            
+            # Previous time step
+            val_grid[:,:,1:d+1,5] = self.pred_grid[:,:,0:d]
+            val_grid[:,:,0,5] = np.zeros((height,width)) 
+                      
+            # Compute new values, update pred grid
+            
+            val_matrix = val_grid.reshape((height*width*depth,6)) # To do a dot product width weight matrix
+            #new_grid = np.diag(np.dot(val_matrix,weight_matrix)) # Diag vector contains correct entries
+            new_grid = np.einsum('ij,ji->i', val_matrix,weight_matrix)
+            new_grid = new_grid / neighbour_count_vec # Correct for neighbour count
+            flattened_original = self.original_grid.copy().reshape((height*width*depth)) # can't use argwhere with 3D indexing
+            new_grid[np.argwhere(~np.isnan(flattened_original))] = flattened_original[np.argwhere(~np.isnan(flattened_original))] # Keep known values from original
+            new_grid = new_grid.reshape((height,width,depth)) # Return to 2D grid
+
+            self.pred_grid = new_grid
+        return(self.pred_grid)
+    
+    
+    def predict_weight(self,f,method):
+        """
+        Predict the weight between two cells based on feature vectors f1 and f2, using either self.model, cosine similarity or the average exact weight computed from the two feature vectors.
+        
+        :param f1: feature vector for the neighbouring cell
+        :param f2: feature vector for the cell of interest
+        :param method: method for computing weights. Options: "predict" (using self.model), "cosine_similarity" (based on feature similarity), "exact" (compute average weight exactly for features)
+        :returns: predicted weight gamma
+        """
+        if(method == "predict"):
+            f = f.reshape(1,len(f))
+            gamma = self.model.predict(f)[0]
+            gamma = max(self.min_gamma,min(gamma,self.max_gamma))
+        elif(method == "cosine_similarity"):
+            gamma = np.dot(f1,f2) / max(np.sum(f1) * np.sum(f2),0.01)
+        elif(method == "exact"):
+            f1_temp = f1.copy()
+            f1_temp[f1_temp == 0] = 0.01
+            gamma = np.mean(f2 / f1_temp) 
+        else:
+            print("Invalid method")
+            intentionalcrash # TODO: start throwing proper exceptions...
+        return(gamma)
     
             
-    def run(self,iterations):
+    def run_old(self,iterations):
         """
         Runs WP-STMRP for the specified number of iterations.
         
@@ -469,7 +650,8 @@ class WP_STMRP(STMRP):
                 y1 = self.G.nodes(data=True)[n1]['y']
                 y2 = self.G.nodes(data=True)[n2]['y']
                 true_weight = y2 / max(0.01,y1)
-                true_gamma[(n1,n2)] = true_weight
+                #true_gamma[(n1,n2)] = true_weight
+                true_gamma[(n1,n2)] = max(self.min_gamma,min(true_weight,self.max_gamma))
                 num_viable += 1
 
         # Setup feature matrix and ground truth vector
@@ -494,7 +676,9 @@ class WP_STMRP(STMRP):
                 
                 f1 = train_features[r1,c1,:]
                 f2 = train_features[r2,c2,:]
-                if(self.G.nodes(data=True)[n1]['t'] != self.G.nodes(data=True)[n2]['t']):
+                if(self.G.nodes(data=True)[n1]['t'] > self.G.nodes(data=True)[n2]['t']):
+                    f3 = np.array([1])
+                elif(self.G.nodes(data=True)[n1]['t'] < self.G.nodes(data=True)[n2]['t']):
                     f3 = np.array([1])
                 else:
                     f3 = np.array([0])

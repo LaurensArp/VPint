@@ -328,8 +328,126 @@ class SD_STMRP(STMRP):
         :param tau: user-supplied tau value
         """
         self.tau = tau
+        
+        
+    def run(self,iterations):
+        """
+        Runs SD-STMRP for the specified number of iterations. Creates a 4D (h,w,t,6) tensor val_grid, where the 4th axis corresponds to a neighbour of each cell, and a 4D (h,w,t,6) weight tensor weight_grid, where the 4th axis corresponds to the weights of every neighbour in val_grid's 4th axis. The x and y axes of both tensors are stacked into 2D (h*w*t,6) matrices (one of which is transposed), after which the dot product is taken between both matrices, resulting in a (h*w,h*w) matrix. As we are only interested in multiplying the same row numbers with the same column numbers, we take the diagonal entries of the computed matrix to obtain a 1D (h*w*t) vector of updated values (we use numpy's einsum to do this efficiently, without wasting computation on extra dot products). This vector is then divided element-wise by a vector (flattened 3D grid) counting the number of neighbours of each cell, and we use the object's original_grid to replace wrongly updated known values to their original true values. We finally reshape this vector back to the original 3D pred_grid shape of (h,w,t).
+        
+        :param iterations: number of iterations used for the state value update function. If not specified, terminate once the maximal difference of a cell update dips below termination_threshold
+        :returns: interpolated grid pred_grid
+        """
+        
+        # Setup all this once
+        
+        height = self.pred_grid.shape[0]
+        width = self.pred_grid.shape[1]
+        depth = self.pred_grid.shape[2]
+        
+        h = height - 1
+        w = width - 1
+        d = depth - 1
+        
+        neighbour_count_grid = np.zeros((height,width,depth))
+        weight_grid = np.zeros((height,width,depth,6))
+        val_grid = np.zeros((height,width,depth,6))
+        
+        # Compute weight grid once (vectorise at some point if possible)
+        
+        for i in range(0,height):
+            for j in range(0,width):
+                for t in range(0,depth):
+                    vec = np.ones(6)
+                    vec[0:4] = vec[0:4] * self.gamma
+                    vec[4:6] = vec[4:6] * self.tau
+                    weight_grid[i,j,t,:] = vec
+        
+        weight_matrix = weight_grid.reshape((height*width*depth,6)).transpose()
+        
+        # Set neighbour count and weight grids
+        
+        for i in range(0,height):
+            for j in range(0,width):
+                for t in range(0,depth):
+                    if(i > 0 and i < height-1): 
+                        if(j > 0 and j < width-1):
+                            if(t > 0 and t < depth-1):
+                                # Middle (s), middle (t)
+                                neighbour_count_grid[i,j,t] = 6
+                            else:
+                                # Middle (s), edge (t)
+                                neighbour_count_grid[i,j,t] = 5
+                        elif(j == 0 or j == width-1):
+                            if(t > 0 and t < depth-1):
+                                # L/R edge (s), middle (t)
+                                neighbour_count_grid[i,j,t] = 5
+                            else:
+                                # L/R edge (s), edge (t)
+                                neighbour_count_grid[i,j,t] = 4
+                    elif(i == 0 or i == height-1):
+                        if(j > 0 and j < width-1):
+                            if(t > 0 and t < depth-1):
+                                # T/B edge (s), middle (t)
+                                neighbour_count_grid[i,j,t] = 5
+                            else:
+                                # T/B edge (s), edge (t)
+                                neighbour_count_grid[i,j,t] = 4
+
+                        elif(j == 0 or j == width-1):
+                            if(t > 0 and t < depth-1):
+                                # Corner (s), middle (t)
+                                neighbour_count_grid[i,j,t] = 4
+                            else:
+                                # Corner (s), edge (t)
+                                neighbour_count_grid[i,j,t] = 3
+
+        
+        neighbour_count_vec = neighbour_count_grid.reshape(width*height*depth) # TODO: verify that this is correct
+        
+        # Main loop
+        
+        for it in range(0,iterations):
+            # Set val_grid
+                      
+            # Up
+            val_grid[1:h+1,:,:,0] = self.pred_grid[0:h,:,:] # +1 because it's non-inclusive (0:10 means 0-9)
+            val_grid[0,:,:,0] = np.zeros((width,depth))
             
-    def run(self,iterations=None,termination_threshold=1e-4):
+            # Right
+            val_grid[:,0:w,:,1] = self.pred_grid[:,1:w+1,:]
+            val_grid[:,w,:,1] = np.zeros((height,depth))
+            
+            # Down
+            val_grid[0:h,:,:,2] = self.pred_grid[1:h+1,:,:]
+            val_grid[h,:,:,2] = np.zeros((width,depth))
+            
+            # Left
+            val_grid[:,1:w+1,:,3] = self.pred_grid[:,0:w,:]
+            val_grid[:,0,:,3] = np.zeros((height,depth)) 
+            
+            # Next time step
+            val_grid[:,:,0:d,4] = self.pred_grid[:,:,1:d+1]
+            val_grid[:,:,d,4] = np.zeros((height,width)) 
+            
+            # Previous time step
+            val_grid[:,:,1:d+1,5] = self.pred_grid[:,:,0:d]
+            val_grid[:,:,0,5] = np.zeros((height,width)) 
+                      
+            # Compute new values, update pred grid
+            
+            val_matrix = val_grid.reshape((height*width*depth,6)) # To do a dot product width weight matrix
+            #new_grid = np.diag(np.dot(val_matrix,weight_matrix)) # Diag vector contains correct entries
+            new_grid = np.einsum('ij,ji->i', val_matrix,weight_matrix)
+            new_grid = new_grid / neighbour_count_vec # Correct for neighbour count
+            flattened_original = self.original_grid.copy().reshape((height*width*depth)) # can't use argwhere with 3D indexing
+            new_grid[np.argwhere(~np.isnan(flattened_original))] = flattened_original[np.argwhere(~np.isnan(flattened_original))] # Keep known values from original
+            new_grid = new_grid.reshape((height,width,depth)) # Return to 2D grid
+
+            self.pred_grid = new_grid
+        return(self.pred_grid)
+        
+            
+    def run_old(self,iterations=None,termination_threshold=1e-4):
         """
         Runs SD-STMRP for the specified number of iterations.
         
@@ -387,7 +505,7 @@ class SD_STMRP(STMRP):
         self.update_grid()
         return(self.pred_grid)
         
-    def find_discounts(self,search_epochs,subsample_proportion,ext=None):
+    def find_discounts(self,search_epochs,subsample_proportion,sub_iterations=100,ext=None):
         """
         Automatically sets gamma and tau to the best found value. Currently
         only supports random search.
@@ -430,7 +548,7 @@ class SD_STMRP(STMRP):
                 tau = np.random.rand()
                 temp_MRP.set_gamma(gamma)
                 temp_MRP.set_tau(tau)
-                pred_grid = temp_MRP.run()
+                pred_grid = temp_MRP.run(sub_iterations)
                 
                 # Compute MAE of subsampled predictions
                 err = 0
