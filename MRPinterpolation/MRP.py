@@ -213,7 +213,7 @@ class SMRP(MRP):
         return(G)
     
     
-    def mean_absolute_error(self,true_grid,gridded=False):
+    def mean_absolute_error(self,true_grid,scale_factor=1,gridded=False):
         """
         Compute the mean absolute error of pred_grid given true_grid as ground truth
         
@@ -221,37 +221,34 @@ class SMRP(MRP):
         :param gridded: optional Boolean specifying whether to return an error grid with the MAE
         :returns: mean absolute error, optionally a tuple of MAE and per-cell error
         """
+        
+        # Rescale; naive approach for now
+        
+        
         height = self.pred_grid.shape[0]
         width = self.pred_grid.shape[1]
-        if(self.dims == 3):
-            depth = self.pred_grid.shape[2]
-            error_grid = np.zeros((height,width,depth))
-        else:
-            error_grid = np.zeros((height,width))
+        
+        new_height = int(height/scale_factor)
+        new_width = int(width/scale_factor)
+        
+        new_pred_grid = self.pred_grid.copy().reshape((new_height,int(height/new_height),new_width,int(width/new_width))).sum(3).sum(1)
+        new_original_grid = self.original_grid.copy().reshape((new_height,int(height/new_height),new_width,int(width/new_width))).sum(3).sum(1)
+        new_true_grid = true_grid.copy().reshape((new_height,int(height/new_height),width,int(new_width/new_width))).sum(3).sum(1)
+        error_grid = np.zeros((new_height,new_width))
         
         e = 0
         c = 0
-        for i in range(0,height):
-            for j in range(0,width):
-                if(self.dims == 3):
-                    # Spatio-temporal
-                    for t in range(0,depth):
-                        if(np.isnan(self.original_grid[i][j][t])):
-                            err = abs(self.pred_grid[i][j][t] - true_grid[i][j][t])
-                            error_grid[i][j][t] = err
-                            e += err
-                            c += 1
-                        else:
-                            error_grid[i][j][t] = np.nan
+              
+        for i in range(0,new_height):
+            for j in range(0,new_width):
+                
+                if(np.isnan(new_original_grid[i][j])):
+                    err = abs(new_pred_grid[i][j] - new_true_grid[i][j])
+                    error_grid[i][j] = err
+                    e += err
+                    c += 1
                 else:
-                    # Spatial/temporal
-                    if(np.isnan(self.original_grid[i][j])):
-                        err = abs(self.pred_grid[i][j] - true_grid[i][j])
-                        error_grid[i][j] = err
-                        e += err
-                        c += 1
-                    else:
-                        error_grid[i][j] = np.nan
+                    error_grid[i][j] = 0
         mae = e/c
         if(gridded):
             result = (mae,error_grid)
@@ -480,6 +477,45 @@ class STMRP(MRP):
                         c += 1
                     else:
                         error_grid[i][j] = np.nan
+        mae = e/c
+        if(gridded):
+            result = (mae,error_grid)
+        else:
+            result = mae
+            
+        return(result)
+    
+    
+    def mean_absolute_error2(self,true_grid,gridded=False):
+        """
+        Compute the mean absolute error of pred_grid given true_grid as ground truth
+        
+        :param true_grid: ground truth for all grid cells
+        :param gridded: optional Boolean specifying whether to return an error grid with the MAE
+        :returns: mean absolute error, optionally a tuple of MAE and per-cell error
+        """
+        height = self.pred_grid.shape[0]
+        width = self.pred_grid.shape[1]
+        if(self.dims == 3):
+            depth = self.pred_grid.shape[2]
+            error_grid = np.zeros((height,width,depth))
+        else:
+            error_grid = np.zeros((height,width))
+        
+        e = 0
+        c = 0
+        for i in range(0,height):
+            for j in range(0,width):
+                # Spatio-temporal
+                for t in range(0,depth):
+                    if(np.isnan(self.original_grid[i][j][t])):
+                        err = abs(self.pred_grid[i][j][t] - true_grid[i][j][t])
+                        error_grid[i][j][t] = err
+                        e += err
+                        c += 1
+                    else:
+                        error_grid[i][j][t] = np.nan
+
         mae = e/c
         if(gridded):
             result = (mae,error_grid)
