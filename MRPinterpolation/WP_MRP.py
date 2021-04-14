@@ -252,8 +252,103 @@ class WP_SMRP(SMRP):
         self.update_grid()
         return(self.pred_grid)
        
+        
+    def train(self):
+        # Get training size
+        
+        height = self.pred_grid.shape[0]
+        width = self.pred_grid.shape[1]
+        
+        h = height - 1
+        w = width - 1
+
+        c = 0
+        for i in range(0,height):
+            for j in range(0,width):
+                y2 = self.original_grid[i,j]
+                if(not(np.isnan(y2))):
+                    if(i > 0):
+                        # Top
+                        y1 = self.original_grid[i,j]
+                        if(not(np.isnan(y1))):
+                            c += 1
+                    if(j < w):
+                        # Right
+                        y1 = self.original_grid[i,j+1]
+                        if(not(np.isnan(y1))):
+                            c += 1                        
+                    if(i < h):
+                        # Bottom                       
+                        y1 = self.original_grid[i+1,j]
+                        if(not(np.isnan(y1))):
+                            c += 1  
+                    if(j > 0):
+                        # Left                       
+                        y1 = self.original_grid[i,j-1]
+                        if(not(np.isnan(y1))):
+                            c += 1
+        
+        training_size = c
+        num_features = self.feature_grid.shape[2] * 2
+        
+        X_train = np.zeros((training_size,num_features))
+        y_train = np.zeros(training_size)
+        
+        c = 0
+        for i in range(0,height):
+            for j in range(0,width):
+                f2 = self.feature_grid[i,j,:]
+                y2 = self.original_grid[i,j]
+                if(not(np.isnan(y2))):
+                    if(i > 0):
+                        # Top
+                        y1 = self.original_grid[i,j]
+                        if(not(np.isnan(y1))):
+                            f1 = self.feature_grid[i-1,j,:]
+                            f = np.concatenate((f1,f2))
+                            f = f.reshape(1,len(f))
+                            gamma = y2 / max(0.01,y1)
+                            X_train[c,:] = f
+                            y_train[c] = gamma
+                            c += 1
+                    if(j < w):
+                        # Right
+                        y1 = self.original_grid[i,j+1]
+                        if(not(np.isnan(y1))):
+                            f1 = self.feature_grid[i,j+1,:]
+                            f = np.concatenate((f1,f2))
+                            f = f.reshape(1,len(f))
+                            gamma = y2 / max(0.01,y1)
+                            X_train[c,:] = f
+                            y_train[c] = gamma
+                            c += 1                        
+                    if(i < h):
+                        # Bottom                       
+                        y1 = self.original_grid[i+1,j]
+                        if(not(np.isnan(y1))):
+                            f1 = self.feature_grid[i+1,j,:]
+                            f = np.concatenate((f1,f2))
+                            f = f.reshape(1,len(f))
+                            gamma = y2 / max(0.01,y1)
+                            X_train[c,:] = f
+                            y_train[c] = gamma
+                            c += 1  
+                    if(j > 0):
+                        # Left                       
+                        y1 = self.original_grid[i,j-1]
+                        if(not(np.isnan(y1))):
+                            f1 = self.feature_grid[i,j-1,:]
+                            f = np.concatenate((f1,f2))
+                            f = f.reshape(1,len(f))
+                            gamma = y2 / max(0.01,y1)
+                            X_train[c,:] = f
+                            y_train[c] = gamma
+                            c += 1
+                            
+        self.model.fit(X_train,y_train)
+                        
     
-    def train(self,train_grid=None,train_features=None):
+    def train_old(self,train_grid=None,train_features=None):
         """
         Trains WP-SMRP's weight prediction model on either subsampled
         data from original_grid and feature_grid, or a user-supplied 
@@ -623,9 +718,144 @@ class WP_STMRP(STMRP):
         self.update_grid()
         return(self.pred_grid)
     
+    def train(self):
+        # Get training size
+        
+        height = self.pred_grid.shape[0]
+        width = self.pred_grid.shape[1]
+        depth = self.pred_grid.shape[2]
+        
+        h = height - 1
+        w = width - 1
+        d = depth - 1
+
+        c = 0
+        for i in range(0,height):
+            for j in range(0,width):
+                for t in range(0,depth):
+                    y2 = self.original_grid[i,j,t]
+                    if(not(np.isnan(y2))):
+                        if(i > 0):
+                            # Top
+                            y1 = self.original_grid[i,j,t]
+                            if(not(np.isnan(y1))):
+                                c += 1
+                        if(j < w):
+                            # Right
+                            y1 = self.original_grid[i,j+1,t]
+                            if(not(np.isnan(y1))):
+                                c += 1                        
+                        if(i < h):
+                            # Bottom                       
+                            y1 = self.original_grid[i+1,j,t]
+                            if(not(np.isnan(y1))):
+                                c += 1  
+                        if(j > 0):
+                            # Left                       
+                            y1 = self.original_grid[i,j-1,t]
+                            if(not(np.isnan(y1))):
+                                c += 1
+                        if(t > 0):
+                            # Before
+                            y1 = self.original_grid[i,j,t-1]
+                            if(not(np.isnan(y1))):
+                                c += 1
+                        if(t < d):
+                            # After                       
+                            y1 = self.original_grid[i,j,t+1]
+                            if(not(np.isnan(y1))):
+                                c += 1
+        
+        training_size = c
+        num_features = self.feature_grid.shape[2] * 2 + 1
+        
+        X_train = np.zeros((training_size,num_features))
+        y_train = np.zeros(training_size)
+        
+        c = 0
+        for i in range(0,height):
+            for j in range(0,width):
+                for t in range(0,depth):
+                    f2 = self.feature_grid[i,j,:]
+                    y2 = self.original_grid[i,j,t]
+                    if(not(np.isnan(y2))):
+                        if(i > 0):
+                            # Top
+                            y1 = self.original_grid[i,j,t]
+                            if(not(np.isnan(y1))):
+                                f1 = self.feature_grid[i-1,j,:]
+                                f3 = np.array([0])
+                                f = np.concatenate((f1,f2,f3))
+                                f = f.reshape(1,len(f))
+                                gamma = y2 / max(0.01,y1)
+                                X_train[c,:] = f
+                                y_train[c] = gamma
+                                c += 1
+                        if(j < w):
+                            # Right
+                            y1 = self.original_grid[i,j+1,t]
+                            if(not(np.isnan(y1))):
+                                f1 = self.feature_grid[i,j+1,:]
+                                f3 = np.array([0])
+                                f = np.concatenate((f1,f2,f3))
+                                f = f.reshape(1,len(f))
+                                gamma = y2 / max(0.01,y1)
+                                X_train[c,:] = f
+                                y_train[c] = gamma
+                                c += 1                        
+                        if(i < h):
+                            # Bottom                       
+                            y1 = self.original_grid[i+1,j,t]
+                            if(not(np.isnan(y1))):
+                                f1 = self.feature_grid[i+1,j,:]
+                                f3 = np.array([0])
+                                f = np.concatenate((f1,f2,f3))
+                                f = f.reshape(1,len(f))
+                                gamma = y2 / max(0.01,y1)
+                                X_train[c,:] = f
+                                y_train[c] = gamma
+                                c += 1  
+                        if(j > 0):
+                            # Left                       
+                            y1 = self.original_grid[i,j-1,t]
+                            if(not(np.isnan(y1))):
+                                f1 = self.feature_grid[i,j-1,:]
+                                f3 = np.array([0])
+                                f = np.concatenate((f1,f2,f3))
+                                f = f.reshape(1,len(f))
+                                gamma = y2 / max(0.01,y1)
+                                X_train[c,:] = f
+                                y_train[c] = gamma
+                                c += 1
+                        if(t > 0):
+                            # Before
+                            y1 = self.original_grid[i,j,t-1]
+                            if(not(np.isnan(y1))):
+                                f1 = self.feature_grid[i,j,:]
+                                f3 = np.array([-1])
+                                f = np.concatenate((f1,f2,f3))
+                                f = f.reshape(1,len(f))
+                                gamma = y2 / max(0.01,y1)
+                                X_train[c,:] = f
+                                y_train[c] = gamma
+                                c += 1
+                        if(t < d):
+                            # After                       
+                            y1 = self.original_grid[i,j,t+1]
+                            if(not(np.isnan(y1))):
+                                f1 = self.feature_grid[i,j,:]
+                                f3 = np.array([1])
+                                f = np.concatenate((f1,f2,f3))
+                                f = f.reshape(1,len(f))
+                                gamma = y2 / max(0.01,y1)
+                                X_train[c,:] = f
+                                y_train[c] = gamma
+                                c += 1
+                            
+        self.model.fit(X_train,y_train)
     
     
-    def train(self,train_grid=None,train_features=None):
+    def train_old(self,train_grid=None,train_features=None):
         """
         Trains WP-STMRP's weight prediction model on either subsampled
         data from original_grid and feature_grid, or a user-supplied 

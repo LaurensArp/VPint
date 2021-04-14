@@ -47,18 +47,38 @@ def load_spatial_data(spatial_data,bbox_tl,bbox_br,missing_value_method):
     return(S)
 
 
-def assign_shapes_to_f_grid(S,meta,type_filter_method,taxonomy_path=None):
+def assign_shapes_to_f_grid(S,meta,type_filter_method,additional_params=None):
     
     if(type_filter_method == "taxonomy"):
         num_features = 6
         
         # Build taxonomy
         taxonomy = {}
-        df = pd.read_csv(taxonomy_path,sep="\t",header=None)
+        df = pd.read_csv(additional_params["taxonomy_path"],sep="\t",header=None)
         for i,r in df.iterrows():
             original = r[0]
             mapping = r[1]
             taxonomy[original] = mapping
+            
+    elif(type_filter_method == "top_frequent"):
+        num_features = additional_params["num_features"]
+        
+        type_count = {}
+        # Find most frequent types
+        
+        for i,r in S.iterrows():
+            f_type = r['type']
+            if(f_type in type_count):
+                type_count[f_type] = type_count[f_type] + 1
+            else:
+                type_count[f_type] = 1
+        
+        type_order = {}
+        sort = sorted(type_count.items(), key=lambda x: x[1], reverse=True)
+        for i in range(0,num_features-1):
+            type_order[sort[i][0]] = i
+       
+                
 
     # Build grid
     
@@ -93,16 +113,18 @@ def assign_shapes_to_f_grid(S,meta,type_filter_method,taxonomy_path=None):
 
             else:
                 f_index = 5
-        else:
-            f_index = 0
+        #else:
+        #    f_index = 0
+            
+        elif(type_filter_method == "top_frequent"):
+            if(f_type in type_order):
+                f_index = type_order[sort[i][0]]
+            else:
+                f_index = num_features - 1 # last element
 
         f_grid[y_index,x_index,f_index] = f_grid[y_index,x_index,f_index] + 1
         
     return(f_grid)
-
-
-
-
 
 
 def clip_area(S,tl,br):
@@ -117,3 +139,69 @@ def clip_area(S,tl,br):
     polygon = Polygon(points)
     S_clipped = gpd.clip(S,polygon)
     return(S_clipped)
+
+
+
+def normalise_attributes(f_grid,method):
+    height = f_grid.shape[0]
+    width = f_grid.shape[1]
+    num_features = f_grid.shape[2]
+    
+    new_grid = np.zeros((height,width,num_features))
+    
+    # Unit length, fastest, probably worst
+    if(method == "unit"):
+        for i in range(0,height):
+            for j in range(0,width):
+                A = f_grid[i,j,:]
+                length = sum(A)
+                if(length > 0):
+                    A = A / sum(A)
+                    new_grid[i,j,:] = A
+    
+    # Z-score normalisation, common in ML, needs 2 passes over all nodes
+    elif(method == "z_score"):
+        X = f_grid.reshape((height*width,num_features))
+            
+        means = np.zeros(num_features)
+        stds = np.zeros(num_features)
+        
+        for f in range(0,num_features):
+            means[f] = np.mean(X[:,f])
+            stds[f] = np.std(X[:,f])
+        
+        for i in range(0,height):
+            for j in range(0,width):
+                A = f_grid[i,j,:]
+                A_new = np.zeros(num_features)
+                for f in range(0,num_features):
+                    A_new[f] = (A[f] - means[f]) / stds[f]
+                new_grid[i,j,:] = A_new
+        
+    # Mean normalisation, needs 2 passes
+    elif(method == "mean_norm"):
+        X = f_grid.reshape((height*width,num_features))
+            
+        means = np.zeros(num_features)
+        maxs = np.zeros(num_features)
+        mins = np.zeros(num_features)
+        
+        for f in range(0,num_features):
+            means[f] = np.mean(X[:,f])
+            maxs[f] = np.max(X[:,f])
+            mins[f] = np.min(X[:,f])
+        
+        for i in range(0,height):
+            for j in range(0,width):
+                A = f_grid[i,j,:]
+                A_new = np.zeros(num_features)
+                for f in range(0,num_features):
+                    A_new[f] = (A[f] - means[f]) / (maxs[f] - mins[f])
+                new_grid[i,j,:] = A_new
+            
+    elif(method == "none"):
+            pass
+    else:
+        print("Invalid normalisation method.")
+        
+    return(new_grid)

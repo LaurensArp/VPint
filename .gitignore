@@ -10,3 +10,9 @@
 # Testing notebooks
 *.ipynb
 *.ipynb_checkpoints
+
+# Autokeras directory
+autokeras/
+
+# Smac directory
+smac/
