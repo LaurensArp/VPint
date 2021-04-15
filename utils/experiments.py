@@ -77,7 +77,6 @@ def run_experiments_3D(grid_true,f_grid,alg,iterations,params,hidden_method="ran
     runtimes = np.zeros(iterations)
         
     for it in range(0,iterations):
-    
         if(hidden_method == "random"):
             grid = hide_values_uniform_3D(grid_true,params["hidden_proportion"])
         elif(hidden_method == "clouds"):

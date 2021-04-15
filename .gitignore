@@ -16,3 +16,6 @@ autokeras/
 
 # Smac directory
 smac/
+
+# Smac run file
+run_smac.py
