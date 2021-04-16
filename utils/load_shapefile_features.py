@@ -200,7 +200,7 @@ def normalise_attributes(f_grid,method):
                 new_grid[i,j,:] = A_new
             
     elif(method == "none"):
-            pass
+        new_grid = f_grid.copy()
     else:
         print("Invalid normalisation method.")
         
