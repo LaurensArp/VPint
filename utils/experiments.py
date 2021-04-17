@@ -9,8 +9,9 @@ from MRPinterpolation.WP_MRP import WP_SMRP, WP_STMRP
 
 import time
 import numpy as np
+import os
 
-def run_experiments_2D(grid_true,f_grid,alg,iterations,params,hidden_method="random"):
+def run_experiments_2D(grid_true,f_grid,alg,iterations,params,hidden_method="random",save=False):
 
     result_grids = np.zeros((iterations,grid_true.shape[0],grid_true.shape[1]))
     runtimes = np.zeros(iterations)
@@ -65,13 +66,18 @@ def run_experiments_2D(grid_true,f_grid,alg,iterations,params,hidden_method="ran
         et = time.time()
         runtimes[it] = int(et-st)
         result_grids[it,:,:] = pred_grid
+        mae = np.mean(np.absolute(pred_grid-grid_true))
+        runtime = int(et-st)
+        
+        if(save):
+            save_results(mae,runtime,params)
         
     return(result_grids,runtimes)
 
 
 
 
-def run_experiments_3D(grid_true,f_grid,alg,iterations,params,hidden_method="random"):
+def run_experiments_3D(grid_true,f_grid,alg,iterations,params,hidden_method="random",save=False):
 
     result_grids = np.zeros((iterations,grid_true.shape[0],grid_true.shape[1],grid_true.shape[2]))
     runtimes = np.zeros(iterations)
@@ -125,5 +131,31 @@ def run_experiments_3D(grid_true,f_grid,alg,iterations,params,hidden_method="ran
         et = time.time()
         runtimes[it] = int(et-st)
         result_grids[it,:,:,:] = pred_grid
+        mae = np.mean(np.absolute(pred_grid-grid_true))
+        runtime = int(et-st)
+        
+        if(save):
+            save_results(mae,runtime,params)
         
     return(result_grids,runtimes)
+
+
+
+def save_results(mae,runtime,params):
+    save_dir = params["save_dir"]
+    save_path = params["save_path"]
+    setting_name = params["setting_name"]
+    alg = params["alg"]
+    hidden_method = params["hidden_method"]
+    
+    if(not(os.path.exists(save_path + "/" + save_dir))):
+        os.mkdir(save_path + "/" + save_dir)
+    if(not(os.path.exists(save_path + "/" + save_dir + "/" + setting_name))):
+        os.mkdir(save_path + "/" + save_dir + "/" + setting_name)
+    if(not(os.path.exists(save_path + "/" + save_dir + "/" + setting_name + "/" + alg + ".csv"))): 
+        with open(save_path + "/" + save_dir + "/" + setting_name + "/" + alg + "_" + hidden_method + ".csv",'w') as fp:
+            fp.write("mae,runtime\n")
+            
+    with open(save_path + "/" + save_dir + "/" + setting_name + "/" + alg + "_" + hidden_method + ".csv",'a') as fp:
+        s = str(mae) + "," + str(runtime) + "\n"
+        fp.write(s)
