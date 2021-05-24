@@ -1,2 +1,0 @@
-[WARNING] [2021-04-24 15:37:11,330:distributed.nanny] Restarting worker
-[DEBUG] [2021-04-24 15:37:20,991:distributed.comm.core] Could not connect, waiting for 0.7533521963842853 before retrying
