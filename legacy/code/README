@@ -1,4 +1,4 @@
-This repository contains the code for IJCAI submission 4750:
+This repository contains the code for:
 "A Markov Reward Process-Based Approach to Spatial Interpolation". Our code
 is very much "research code"; though we tried to clean up our code by removing
 unused functions and restructuring the files to be as accessible as possible, 
