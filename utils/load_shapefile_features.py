@@ -118,7 +118,7 @@ def assign_shapes_to_f_grid(S,meta,type_filter_method,additional_params=None):
             
         elif(type_filter_method == "top_frequent"):
             if(f_type in type_order):
-                f_index = type_order[sort[i][0]]
+                f_index = type_order[f_type]
             else:
                 f_index = num_features - 1 # last element
 
@@ -196,7 +196,7 @@ def normalise_attributes(f_grid,method):
                 A = f_grid[i,j,:]
                 A_new = np.zeros(num_features)
                 for f in range(0,num_features):
-                    A_new[f] = (A[f] - means[f]) / (maxs[f] - mins[f])
+                    A_new[f] = (A[f] - means[f]) / max((maxs[f] - mins[f]),0.001)
                 new_grid[i,j,:] = A_new
             
     elif(method == "none"):

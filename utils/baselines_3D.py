@@ -450,7 +450,7 @@ def CNN_train_pixel(grid,f_grid,model,max_trials=100,epochs=100,validation_split
                         y_train[c] = grid[i,j,t]
                         c += 1
                 
-    model.fit(X_train, y_train, epochs=epochs)
+    model.fit(X_train, y_train, epochs=epochs, verbose=0)
     
     return(model)
                 

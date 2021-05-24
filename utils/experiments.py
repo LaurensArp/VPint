@@ -32,45 +32,63 @@ def run_experiments_2D(grid_true,f_grid,alg,iterations,params,hidden_method="ran
             MRP = SD_SMRP(grid)
             MRP.find_gamma(params["SD_epochs"],params["subsample_proportion"],
                           sub_iterations=params["sub_iterations"])
+            tt = time.time()
             pred_grid = MRP.run(params["iterations"])
+            rt = time.time()
         elif(alg == "WP_MRP"):
             MRP = WP_SMRP(grid,f_grid,params["model"])
             MRP.train()
+            tt = time.time()
             pred_grid = MRP.run(params["iterations"])
+            rt = time.time()
         elif(alg == "OK"):
+            tt = time.time()
             pred_grid, var_grid = utils.baselines_2D.ordinary_kriging(grid,params["variogram_model"])
+            rt = time.time()
         elif(alg == "UK"):
+            tt = time.time()
             pred_grid, var_grid = utils.baselines_2D.universal_kriging(grid,params["variogram_model"])
+            rt = time.time()
         elif(alg == "basic"):
             model = utils.baselines_2D.regression_train(grid,f_grid,params["model"])
+            tt = time.time()
             pred_grid = utils.baselines_2D.regression_run(grid,f_grid,model)
+            rt = time.time()
         elif(alg == "SAR"):
             model = utils.baselines_2D.SAR_train(grid,f_grid,params["model"])
+            tt = time.time()
             pred_grid = utils.baselines_2D.SAR_run(grid,f_grid,model)
+            rt = time.time()
         elif(alg == "MA"):
             model, sub_model, sub_error_grid = utils.baselines_2D.MA_train(grid,f_grid,params["model"],params["sub_model"])
+            tt = time.time()
             pred_grid = utils.baselines_2D.MA_run(grid,f_grid,model,sub_model,sub_error_grid)
+            rt = time.time()
         elif(alg == "ARMA"):
             model, sub_model, sub_error_grid = utils.baselines_2D.ARMA_train(grid,f_grid,params["model"],params["sub_model"])
+            tt = time.time()
             pred_grid = utils.baselines_2D.ARMA_run(grid,f_grid,model,sub_model,sub_error_grid)
+            rt = time.time()
         elif(alg == "CNN"):
             model = utils.baselines_2D.CNN_train_pixel(grid,f_grid,params["nn_model"],max_trials=params["nn_max_trials"],
                                     epochs=params["nn_epochs"],train_fill=params["nn_train_fill"],
                                    window_height=params["nn_window_height"],
                                     window_width=params["nn_window_width"])
+            tt = time.time()
             pred_grid = utils.baselines_2D.CNN_run_pixel(grid,f_grid,model,window_height=params["nn_window_height"],
                                       window_width=params["nn_window_width"])
+            rt = time.time()
         else:
             print("Invalid algorithm")
     
-        et = time.time()
-        runtimes[it] = int(et-st)
+        runtimes[it] = float(rt-st)
         result_grids[it,:,:] = pred_grid
         mae = np.mean(np.absolute(pred_grid-grid_true))
-        runtime = int(et-st)
+        train_time = float(tt-st)
+        run_time = float(rt-tt)
         
         if(save):
-            save_results(mae,runtime,params)
+            save_results(mae,train_time,run_time,params)
         
     return(result_grids,runtimes)
 
@@ -97,51 +115,78 @@ def run_experiments_3D(grid_true,f_grid,alg,iterations,params,hidden_method="ran
             MRP = SD_STMRP(grid)
             MRP.find_discounts(params["SD_epochs"],params["subsample_proportion"],
                           sub_iterations=params["sub_iterations"])
+            tt = time.time()
             pred_grid = MRP.run(params["iterations"])
+            rt = time.time()
         elif(alg == "WP_MRP"):
             MRP = WP_STMRP(grid,f_grid,params["model"])
             MRP.train()
+            tt = time.time()
             pred_grid = MRP.run(params["iterations"])
+            rt = time.time()
         elif(alg == "OK"):
+            tt = time.time()
             pred_grid, var_grid = utils.baselines_3D.ordinary_kriging(grid,params["variogram_model"])
+            rt = time.time()
         elif(alg == "UK"):
+            tt = time.time()
             pred_grid, var_grid = utils.baselines_3D.universal_kriging(grid,params["variogram_model"])
+            rt = time.time()
         elif(alg == "basic"):
             model = utils.baselines_3D.regression_train(grid,f_grid,params["model"])
+            tt = time.time()
             pred_grid = utils.baselines_3D.regression_run(grid,f_grid,model)
+            rt = time.time()
         elif(alg == "SAR"):
             model = utils.baselines_3D.SAR_train(grid,f_grid,params["model"])
+            tt = time.time()
             pred_grid = utils.baselines_3D.SAR_run(grid,f_grid,model)
+            rt = time.time()
         elif(alg == "MA"):
             model, sub_model, sub_error_grid = utils.baselines_3D.MA_train(grid,f_grid,params["model"],params["sub_model"])
+            tt = time.time()
             pred_grid = utils.baselines_3D.MA_run(grid,f_grid,model,sub_model,sub_error_grid)
+            rt = time.time()
         elif(alg == "ARMA"):
             model, sub_model, sub_error_grid = utils.baselines_3D.ARMA_train(grid,f_grid,params["model"],params["sub_model"])
+            tt = time.time()
             pred_grid = utils.baselines_3D.ARMA_run(grid,f_grid,model,sub_model,sub_error_grid)
+            rt = time.time()
         elif(alg == "CNN"):
             model = utils.baselines_3D.CNN_train_pixel(grid,f_grid,params["nn_model"],max_trials=params["nn_max_trials"],
                                     epochs=params["nn_epochs"],train_fill=params["nn_train_fill"],
                                    window_height=params["nn_window_height"],
                                     window_width=params["nn_window_width"])
+            tt = time.time()
             pred_grid = utils.baselines_3D.CNN_run_pixel(grid,f_grid,model,window_height=params["nn_window_height"],
                                       window_width=params["nn_window_width"])
+            rt = time.time()
         else:
             print("Invalid algorithm")
     
         et = time.time()
-        runtimes[it] = int(et-st)
+        runtimes[it] = float(rt-st)
         result_grids[it,:,:,:] = pred_grid
         mae = np.mean(np.absolute(pred_grid-grid_true))
-        runtime = int(et-st)
+        train_time = float(tt-st)
+        run_time = float(rt-tt)
         
         if(save):
-            save_results(mae,runtime,params)
+            save_results(mae,train_time,run_time,params)
         
     return(result_grids,runtimes)
 
 
+def save_results(mae,train_time,run_time,params):
+    save_path = params["save_path"]
 
-def save_results(mae,runtime,params):
+            
+    with open(save_path,'a') as fp:
+        s = str(mae) + "," + str(train_time) + "," + str(run_time) + "\n"
+        fp.write(s)
+
+
+def save_results_old(mae,train_time,run_time,params):
     save_dir = params["save_dir"]
     save_path = params["save_path"]
     setting_name = params["setting_name"]
@@ -152,10 +197,10 @@ def save_results(mae,runtime,params):
         os.mkdir(save_path + "/" + save_dir)
     if(not(os.path.exists(save_path + "/" + save_dir + "/" + setting_name))):
         os.mkdir(save_path + "/" + save_dir + "/" + setting_name)
-    if(not(os.path.exists(save_path + "/" + save_dir + "/" + setting_name + "/" + alg + ".csv"))): 
+    if(not(os.path.exists(save_path + "/" + save_dir + "/" + setting_name + "/" + alg + "_" + hidden_method + ".csv"))): 
         with open(save_path + "/" + save_dir + "/" + setting_name + "/" + alg + "_" + hidden_method + ".csv",'w') as fp:
-            fp.write("mae,runtime\n")
+            fp.write("mae,train_time,run_time\n")
             
     with open(save_path + "/" + save_dir + "/" + setting_name + "/" + alg + "_" + hidden_method + ".csv",'a') as fp:
-        s = str(mae) + "," + str(runtime) + "\n"
+        s = str(mae) + "," + str(train_time) + "," + str(run_time) + "\n"
         fp.write(s)

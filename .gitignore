@@ -19,3 +19,6 @@ smac/
 
 # Smac run file
 run_smac.py
+
+# Results
+results/

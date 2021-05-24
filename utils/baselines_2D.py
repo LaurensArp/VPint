@@ -352,12 +352,12 @@ def grid_slice(f_grid,i,j,window_height,window_width,fill=None):
         else:
             offset_y2 = (height-1) - i
             
-    if((j-w_h) < 0):
+    if((j-w_w) < 0):
         if(fill == None):
             return(False)
         else:
             offset_x1 += (j-w_w)
-    elif((j+w_h) > height-1):
+    elif((j+w_w) > width-1):
         if(fill == None):
             return(False)
         else:
@@ -405,7 +405,7 @@ def CNN_train_pixel(grid,f_grid,model,max_trials=100,epochs=100,validation_split
                     y_train[c] = grid[i,j]
                     c += 1
                 
-    model.fit(X_train, y_train, epochs=epochs)
+    model.fit(X_train, y_train, epochs=epochs, verbose=0)
     
     return(model)
                 
