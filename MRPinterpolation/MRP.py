@@ -173,7 +173,7 @@ class SMRP(MRP):
         Returns pred_grid
     """
     
-    def __init__(self,grid,init_strategy='zero'):
+    def __init__(self,grid,init_strategy='mean'):
         super().__init__(grid,init_strategy=init_strategy)
         self.G = self.to_graph()
         
@@ -306,7 +306,7 @@ class STMRP(MRP):
         Returns pred_grid
     """
 
-    def __init__(self,data,auto_timesteps,init_strategy='zero'):       
+    def __init__(self,data,auto_timesteps,init_strategy='mean'):       
         if(auto_timesteps):
             new_grid = self.set_timesteps(data.copy())
         else:

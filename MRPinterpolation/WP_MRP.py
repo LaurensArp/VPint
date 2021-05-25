@@ -35,7 +35,7 @@ class WP_SMRP(SMRP):
         compute an indication of uncertainty per pixel in pred_grid
     """    
     
-    def __init__(self,grid,feature_grid,model,init_strategy='zero',max_gamma=np.inf,min_gamma=0):       
+    def __init__(self,grid,feature_grid,model,init_strategy='mean',max_gamma=np.inf,min_gamma=0):       
         super().__init__(grid,init_strategy=init_strategy)
         self.feature_grid = feature_grid.copy().astype(float)
         self.model = model 
