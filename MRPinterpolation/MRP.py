@@ -29,7 +29,7 @@ class MRP:
         Computes the mean absolute error of pred_grid compared to a given ground truth grid
     """
     
-    def __init__(self,grid,init_strategy='zero'):
+    def __init__(self,grid,init_strategy='mean'):
         self.original_grid = grid.copy()
         self.dims = len(grid.shape)
         self.init_pred_grid(init_strategy=init_strategy)
@@ -264,7 +264,7 @@ class SMRP(MRP):
             r = n[1]['r']
             c = n[1]['c']
             E = n[1]['E']
-            self.pred_grid[r][c] = E
+            self.pred_grid2[r][c] = E #TODO: change back
             
             
 class STMRP(MRP):

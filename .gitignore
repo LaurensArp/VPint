@@ -22,3 +22,6 @@ run_smac.py
 
 # Results
 results/
+
+# Autosklearn output
+autosklearn/

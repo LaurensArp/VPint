@@ -176,6 +176,9 @@ class WP_SMRP(SMRP):
             return(self.pred_grid)
         
            
+            
+
+            
     def run_old(self,iterations=None,termination_threshold=1e-4,method='predict'):
         """
         Runs WP-SMRP for the specified number of iterations.
