@@ -281,13 +281,17 @@ class WP_SMRP(SMRP):
             intentionalcrash # TODO: start throwing proper exceptions...
         return(gamma)
         
-
         
-    def train(self):
+    def train(self,training_set=None,training_features=None):
+        
+        if(training_set is None or training_features is None):
+            training_set = self.original_grid.copy()
+            training_features = self.feature_grid.copy()
+        
         # Get training size
         
-        height = self.pred_grid.shape[0]
-        width = self.pred_grid.shape[1]
+        height = training_set.shape[0]
+        width = training_set.shape[1]
         
         h = height - 1
         w = width - 1
@@ -295,31 +299,31 @@ class WP_SMRP(SMRP):
         c = 0
         for i in range(0,height):
             for j in range(0,width):
-                y2 = self.original_grid[i,j]
+                y2 = training_set[i,j]
                 if(not(np.isnan(y2))):
                     if(i > 0):
                         # Top
-                        y1 = self.original_grid[i,j]
+                        y1 = training_set[i,j]
                         if(not(np.isnan(y1))):
                             c += 1
                     if(j < w):
                         # Right
-                        y1 = self.original_grid[i,j+1]
+                        y1 = training_set[i,j+1]
                         if(not(np.isnan(y1))):
                             c += 1                        
                     if(i < h):
                         # Bottom                       
-                        y1 = self.original_grid[i+1,j]
+                        y1 = training_set[i+1,j]
                         if(not(np.isnan(y1))):
                             c += 1  
                     if(j > 0):
                         # Left                       
-                        y1 = self.original_grid[i,j-1]
+                        y1 = training_set[i,j-1]
                         if(not(np.isnan(y1))):
                             c += 1
         
         training_size = c
-        num_features = self.feature_grid.shape[2] * 2
+        num_features = training_features.shape[2] * 2
         
         X_train = np.zeros((training_size,num_features))
         y_train = np.zeros(training_size)
@@ -327,14 +331,14 @@ class WP_SMRP(SMRP):
         c = 0
         for i in range(0,height):
             for j in range(0,width):
-                f2 = self.feature_grid[i,j,:]
-                y2 = self.original_grid[i,j]
+                f2 = training_features[i,j,:]
+                y2 = training_set[i,j]
                 if(not(np.isnan(y2))):
                     if(i > 0):
                         # Top
-                        y1 = self.original_grid[i,j]
+                        y1 = training_set[i,j]
                         if(not(np.isnan(y1))):
-                            f1 = self.feature_grid[i-1,j,:]
+                            f1 = training_features[i-1,j,:]
                             f = np.concatenate((f1,f2))
                             f = f.reshape(1,len(f))
                             gamma = y2 / max(0.01,y1)
@@ -343,9 +347,9 @@ class WP_SMRP(SMRP):
                             c += 1
                     if(j < w):
                         # Right
-                        y1 = self.original_grid[i,j+1]
+                        y1 = training_set[i,j+1]
                         if(not(np.isnan(y1))):
-                            f1 = self.feature_grid[i,j+1,:]
+                            f1 = training_features[i,j+1,:]
                             f = np.concatenate((f1,f2))
                             f = f.reshape(1,len(f))
                             gamma = y2 / max(0.01,y1)
@@ -354,9 +358,9 @@ class WP_SMRP(SMRP):
                             c += 1                        
                     if(i < h):
                         # Bottom                       
-                        y1 = self.original_grid[i+1,j]
+                        y1 = training_set[i+1,j]
                         if(not(np.isnan(y1))):
-                            f1 = self.feature_grid[i+1,j,:]
+                            f1 = training_features[i+1,j,:]
                             f = np.concatenate((f1,f2))
                             f = f.reshape(1,len(f))
                             gamma = y2 / max(0.01,y1)
@@ -365,9 +369,9 @@ class WP_SMRP(SMRP):
                             c += 1  
                     if(j > 0):
                         # Left                       
-                        y1 = self.original_grid[i,j-1]
+                        y1 = training_set[i,j-1]
                         if(not(np.isnan(y1))):
-                            f1 = self.feature_grid[i,j-1,:]
+                            f1 = training_features[i,j-1,:]
                             f = np.concatenate((f1,f2))
                             f = f.reshape(1,len(f))
                             gamma = y2 / max(0.01,y1)
