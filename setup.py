@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(name='VPint',
       version='0.2',
@@ -7,7 +7,7 @@ setup(name='VPint',
       author='Laurens Arp',
       author_email='l.r.arp@liacs.leidenuniv.nl',
       license='GPL-3.0',
-      packages=['VPint'],
+      packages=find_packages(),
       install_requires=[
           'numpy',
       ],
