@@ -2,7 +2,6 @@
 """
 
 import numpy as np
-import networkx as nx
 
 from .MRP import SMRP, STMRP
         
@@ -17,8 +16,6 @@ class SD_SMRP(SMRP):
         the original grid supplied to be interpolated
     pred_grid : 2D numpy array
         interpolated version of original_grid
-    G : networkx directed graph
-        graph representation of pred_grid
     gamma : float
         discount parameter gamma used by SD-MRP (typically 0-1)
 
@@ -152,61 +149,7 @@ class SD_SMRP(SMRP):
         else:
             return(self.pred_grid)
         
-    def run_old(self,iterations=None,termination_threshold=1e-4):
-        """
-        Runs SD-SMRP for the specified number of iterations.
-        
-        :param iterations: optional number of iterations used for the state value update function. If not specified, terminate once the maximal difference of a cell update dips below termination_threshold
-        :param termination_threshold: optional parameter specifying the threshold for auto-termination
-        :returns: interpolated grid pred_grid
-        """
-        it = 0
-        while True:
-            delta = np.zeros(len(self.G.nodes))
-            G = self.G.copy()
-            c = 0
-            
-            # Iterate over nodes
-            for n in self.G.nodes(data=True):
-                r = n[1]['r']
-                c = n[1]['c']
-                y = n[1]['y']
-                E = n[1]['E']
 
-                # Interpolate missing nodes
-                if(np.isnan(y)):
-                    v_a_sum = 0
-                    for n1,n2,w in self.G.in_edges(n[0],data=True):
-                        destination_node = self.G.nodes(data=True)[n1]
-                        E_dest = destination_node['E']
-                        v_a = self.gamma * E_dest
-                        v_a_sum += v_a
-                    E_new = v_a_sum / len(self.G.in_edges(n[0]))
-                    nx.set_node_attributes(G,{n[0]:E_new},'E')
-                    
-                    # Compute delta
-                    delta[c] = abs(E - E_new)
-                    c += 1
-                else:
-                    # Keep known values
-                    nx.set_node_attributes(G,{n[0]:y},'E')
-                    
-                
-            # Apply update
-            self.G = G
-            it += 1
-            
-            # Check termination conditions
-            if(iterations != None):
-                if(it >= iterations):
-                    break
-            else:
-                if(np.max(delta) < termination_threshold):
-                    break
-            
-        # Finalise
-        self.update_grid()
-        return(self.pred_grid)
         
     def find_gamma(self,search_epochs,subsample_proportion,sub_iterations=100,ext=None):
         """
@@ -293,8 +236,6 @@ class SD_STMRP(STMRP):
         the original grid supplied to be interpolated
     pred_grid : 2D numpy array
         interpolated version of original_grid
-    G : networkx directed graph
-        graph representation of pred_grid
     gamma : float
         spatial discount parameter gamma used by SD-STMRP (typically 0-1
     tau : float

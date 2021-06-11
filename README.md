@@ -7,7 +7,6 @@ Further functionality will be added as the need for it arises.
 Dependencies:
 - Python            3.6.12
 - Numpy             1.19.0
-- Networkx          2.4
 
 For reproducibility purposes, see "legacy" code. This implementation
 used a functionally equivalent graph-based implementation of our methods, 

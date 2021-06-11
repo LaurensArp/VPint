@@ -2,7 +2,6 @@
 """
 
 import numpy as np
-import networkx as nx
 
 from .MRP import SMRP, STMRP
 from .SD_MRP import SD_SMRP, SD_STMRP
@@ -174,86 +173,6 @@ class WP_SMRP(SMRP):
             return(self.pred_grid,confidence_grid)
         else:
             return(self.pred_grid)
-        
-           
-            
-
-            
-    def run_old(self,iterations=None,termination_threshold=1e-4,method='predict'):
-        """
-        Runs WP-SMRP for the specified number of iterations.
-        
-        :param iterations: number of iterations used for the state value update function
-        :param method: method for computing weights. Options: "predict" (using self.model), "cosine_similarity" (based on feature similarity), "exact" (compute average weight exactly for features)
-        :returns: interpolated grid pred_grid
-        """
-        it = 0
-        while True:
-            delta = np.zeros(len(self.G.nodes))
-            G = self.G.copy()
-            c = 0
-            
-            for n in self.G.nodes(data=True):
-                r = n[1]['r']
-                c = n[1]['c']
-                y = n[1]['y']
-                E = n[1]['E']
-
-                if(np.isnan(y)):
-                    v_a_sum = 0
-                    for n1,n2,w in self.G.in_edges(n[0],data=True):
-                        destination_node = self.G.nodes(data=True)[n1]
-                        E_dest = destination_node['E']
-                        r1 = self.G.nodes(data=True)[n1]['r']
-                        c1 = self.G.nodes(data=True)[n1]['c']
-                        r2 = self.G.nodes(data=True)[n2]['r']
-                        c2 = self.G.nodes(data=True)[n2]['c']
-
-                        f1 = self.feature_grid[r1,c1,:]
-                        f2 = self.feature_grid[r2,c2,:]
-
-                        if(method == "predict"):
-                            f = np.concatenate((f1,f2))
-                            f = f.reshape(1,len(f))
-                            gamma = self.model.predict(f)[0]
-                            gamma = max(self.min_gamma,min(gamma,self.max_gamma))
-                        elif(method == "cosine_similarity"):
-                            gamma = np.dot(f1,f2) / max(np.sum(f1) * np.sum(f2),0.01)
-                        elif(method == "exact"):
-                            f1_temp = f1.copy()
-                            f1_temp[f1_temp == 0] = 0.01
-                            gamma = np.mean(f2 / f1_temp) 
-                        else:
-                            print("Invalid method")
-                            intentionalcrash # TODO: start throwing proper exceptions...
-
-                        v_a = gamma * max(0.01,E_dest)
-                        v_a_sum += v_a
-                    E_new = v_a_sum / len(self.G.in_edges(n[0]))
-                    nx.set_node_attributes(G,{n[0]:E_new},'E')
-                    
-                    # Compute delta
-                    delta[c] = abs(E - E_new)
-                    c += 1
-
-                else:
-                    nx.set_node_attributes(G,{n[0]:y},'E')
-                    
-            # Apply update
-            self.G = G
-            it += 1
-            
-            # Check termination conditions
-            if(iterations != None):
-                if(it >= iterations):
-                    break
-            else:
-                if(np.max(delta) < termination_threshold):
-                    break
-            
-        # Finalise
-        self.update_grid()
-        return(self.pred_grid)
         
         
     def predict_weight(self,f1,f2,method):
