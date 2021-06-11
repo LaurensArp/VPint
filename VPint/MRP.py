@@ -155,16 +155,11 @@ class SMRP(MRP):
         the original grid supplied to be interpolated
     pred_grid : 2D numpy array
         interpolated version of original_grid
-    G : networkx directed graph
-        graph representation of pred_grid
 
     Methods
     -------
     reset():
         Returns pred_grid and G to their original state
-        
-    to_graph():
-        Converts original_grid to a graph representation
         
     update_grid():
         Updates pred_grid to reflect changes to G
@@ -175,42 +170,6 @@ class SMRP(MRP):
     
     def __init__(self,grid,init_strategy='mean'):
         super().__init__(grid,init_strategy=init_strategy)
-        self.G = self.to_graph()
-        
-        
-    def to_graph(self):
-        """
-        Converts a grid to graph form.
-        
-        :param default_E: default expected value used for initialisation of the MRP
-        """
-        G = nx.DiGraph()
-        
-        grid_height = len(self.original_grid)
-        grid_width = len(self.original_grid[0])
-        
-        for i in range(0,grid_height):
-            for j in range(0,grid_width):
-                val = self.original_grid[i][j]
-                node_name = "r" + str(i) + "c" + str(j)
-                if(np.isnan(val)):
-                    E = np.nanmean(self.original_grid)
-                else:
-                    E = val
-                G.add_node(node_name,y=val,E=E,r=i,c=j)
-
-                # Connect to node above
-                if(i > 0):
-                    neighbour_name = "r" + str(i-1) + "c" + str(j)
-                    G.add_edge(node_name,neighbour_name)
-                    G.add_edge(neighbour_name,node_name)
-                # Connect to node to the left
-                if(j > 0):
-                    neighbour_name = "r" + str(i) + "c" + str(j-1)
-                    G.add_edge(node_name,neighbour_name)
-                    G.add_edge(neighbour_name,node_name)
-
-        return(G)
     
     
     def mean_absolute_error(self,true_grid,scale_factor=1,gridded=False):
@@ -255,17 +214,7 @@ class SMRP(MRP):
         else:
             result = mae
             
-        return(result)
-    
-    
-    def update_grid(self):
-        """Update pred_grid to reflect changes to G"""
-        for n in self.G.nodes(data=True):
-            r = n[1]['r']
-            c = n[1]['c']
-            E = n[1]['E']
-            self.pred_grid2[r][c] = E #TODO: change back
-            
+        return(result)           
             
 class STMRP(MRP):
     """
@@ -280,8 +229,6 @@ class STMRP(MRP):
         interpolated version of original_grid
     true_time_indices : list of integers
         list containing the indices (temporal dimension) of pred_grid provided in the input data 
-    G : networkx directed graph
-        graph representation of pred_grid
 
     Methods
     -------
@@ -296,12 +243,6 @@ class STMRP(MRP):
         Automatically creates a 3D grid from a time-stamped
         dictionary of 2D spatial grids
         
-    to_graph():
-        Converts original_grid to a graph representation
-        
-    update_grid():
-        Updates pred_grid to reflect changes to G
-        
     get_pred_grid():
         Returns pred_grid
     """
@@ -313,7 +254,6 @@ class STMRP(MRP):
             new_grid = self.dim_check(data.copy())
             
         super().__init__(new_grid,init_strategy=init_strategy)
-        self.G = self.to_graph()
            
     def dim_check(self,grid):
         """
@@ -393,49 +333,7 @@ class STMRP(MRP):
         # Return 3D grid
         
         return(grid)
-        
-    def to_graph(self):
-        """
-        Converts a grid to graph form.
-        
-        :param default_E: default expected value used for initialisation of the MRP
-        """
-        G = nx.DiGraph()
-        
-        grid_height = self.original_grid.shape[0]
-        grid_width = self.original_grid.shape[1]
-        grid_depth = self.original_grid.shape[2]
-        
-        for i in range(0,grid_height):
-            for j in range(0,grid_width):
-                for t in range(0,grid_depth):
-                    val = self.original_grid[i][j][t]
-                    if(np.isnan(val)):
-                        E = np.nanmean(self.original_grid)
-                    else:
-                        E = val
-                    node_name = "r" + str(i) + "c" + str(j) + "t" + str(t)
-                    G.add_node(node_name,y=val,E=E,r=i,c=j,t=t)
-
-                    # Connect to node above
-                    if(i > 0):
-                        neighbour_name = "r" + str(i-1) + "c" + str(j) + "t" + str(t)
-                        G.add_edge(node_name,neighbour_name)
-                        G.add_edge(neighbour_name,node_name)
-                    # Connect to node to the left
-                    if(j > 0):
-                        neighbour_name = "r" + str(i) + "c" + str(j-1) + "t" + str(t)
-                        G.add_edge(node_name,neighbour_name)
-                        G.add_edge(neighbour_name,node_name)
-                    # Connect to previous time step
-                    # TODO: user-supplied neighbourhood
-                    if(t > 0):
-                        neighbour_name = "r" + str(i) + "c" + str(j) + "t" + str(t-1)
-                        G.add_edge(node_name,neighbour_name)
-                        G.add_edge(neighbour_name,node_name)
-
-        return(G)
-    
+           
     
     def mean_absolute_error(self,true_grid,gridded=False):
         """
@@ -484,52 +382,3 @@ class STMRP(MRP):
             result = mae
             
         return(result)
-    
-    
-    def mean_absolute_error2(self,true_grid,gridded=False):
-        """
-        Compute the mean absolute error of pred_grid given true_grid as ground truth
-        
-        :param true_grid: ground truth for all grid cells
-        :param gridded: optional Boolean specifying whether to return an error grid with the MAE
-        :returns: mean absolute error, optionally a tuple of MAE and per-cell error
-        """
-        height = self.pred_grid.shape[0]
-        width = self.pred_grid.shape[1]
-        if(self.dims == 3):
-            depth = self.pred_grid.shape[2]
-            error_grid = np.zeros((height,width,depth))
-        else:
-            error_grid = np.zeros((height,width))
-        
-        e = 0
-        c = 0
-        for i in range(0,height):
-            for j in range(0,width):
-                # Spatio-temporal
-                for t in range(0,depth):
-                    if(np.isnan(self.original_grid[i][j][t])):
-                        err = abs(self.pred_grid[i][j][t] - true_grid[i][j][t])
-                        error_grid[i][j][t] = err
-                        e += err
-                        c += 1
-                    else:
-                        error_grid[i][j][t] = np.nan
-
-        mae = e/c
-        if(gridded):
-            result = (mae,error_grid)
-        else:
-            result = mae
-            
-        return(result)
-    
-        
-    def update_grid(self):
-        """Update pred_grid to reflect changes to G"""
-        for n in self.G.nodes(data=True):
-            r = n[1]['r']
-            c = n[1]['c']
-            t = n[1]['t']
-            E = n[1]['E']
-            self.pred_grid[r][c][t] = E

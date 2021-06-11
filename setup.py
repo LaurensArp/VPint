@@ -1,9 +1,9 @@
 from setuptools import setup
 
-setup(name='MRPinterpolation',
+setup(name='VPint',
       version='0.1',
-      description='Markov reward process-based spatial interpolation',
-      url='https://github.com/LaurensArp/MRPinterpolation',
+      description='Value propagation-based spatial and spatio-temporal interpolation',
+      url='https://github.com/LaurensArp/VPint',
       author='Laurens Arp',
       author_email='l.r.arp@liacs.leidenuniv.nl',
       license='GPL-3.0',

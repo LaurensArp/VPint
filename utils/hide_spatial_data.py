@@ -40,6 +40,9 @@ def hide_values_sim_cloud(base_grid,num_points,radius,points=None,num_traj=10):
     
     height = base_grid.shape[0]
     width = base_grid.shape[1]
+    if(len(base_grid.shape)>2):
+        bands = base_grid.shape[2]
+        
     new_grid = base_grid.copy()
     
     for c in range(0,num_points):
@@ -56,7 +59,11 @@ def hide_values_sim_cloud(base_grid,num_points,radius,points=None,num_traj=10):
             j = x
             for b in range(0,radius):
                 (i,j) = step(i,j,height-1,width-1)
-                new_grid[i,j] = np.nan
+                if(len(base_grid.shape)>2):
+                    for band in range(0,bands):
+                        new_grid[i,j,band] = np.nan
+                else:
+                    new_grid[i,j] = np.nan
                 
     return(new_grid)
             

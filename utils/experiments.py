@@ -4,8 +4,8 @@ import utils.baselines_3D
 from utils.hide_spatial_data import hide_values_uniform, hide_values_sim_cloud
 from utils.hide_spatio_temporal_data import hide_values_uniform_3D, hide_values_sim_cloud_3D
 
-from MRPinterpolation.SD_MRP import SD_SMRP, SD_STMRP
-from MRPinterpolation.WP_MRP import WP_SMRP, WP_STMRP
+from VPint.SD_MRP import SD_SMRP, SD_STMRP
+from VPint.WP_MRP import WP_SMRP, WP_STMRP
 
 import time
 import numpy as np

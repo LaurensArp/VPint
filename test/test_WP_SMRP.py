@@ -10,7 +10,7 @@ import pytest
 from sklearn.svm import SVR
 from sklearn.utils.validation import check_is_fitted
 
-from MRPinterpolation.WP_MRP import WP_SMRP
+from VPint.WP_MRP import WP_SMRP
 
 @pytest.fixture
 def init_grid():

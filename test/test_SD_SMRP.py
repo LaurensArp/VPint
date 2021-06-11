@@ -7,7 +7,7 @@ import pytest
 import numpy as np
 import networkx as nx
 
-from MRPinterpolation.SD_MRP import SD_SMRP
+from VPint.SD_MRP import SD_SMRP
 
 @pytest.fixture
 def init_grid():
