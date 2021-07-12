@@ -151,7 +151,7 @@ class SD_SMRP(SMRP):
         
 
         
-    def find_gamma(self,search_epochs,subsample_proportion,sub_iterations=100,ext=None):
+    def find_gamma(self,search_epochs,subsample_proportion,sub_iterations=100,ext=None,max_gamma=1,min_gamma=0):
         """
         Automatically sets gamma to the best found value. Currently
         only supports random search.
@@ -182,7 +182,7 @@ class SD_SMRP(SMRP):
                 # Random search for best gamma for search_epochs iterations
                 
                 temp_MRP = SD_SMRP(sub_grid)
-                gamma = np.random.rand()
+                gamma = np.random.uniform(low=min_gamma,high=max_gamma)
                 temp_MRP.set_gamma(gamma)
                 pred_grid = temp_MRP.run(sub_iterations)
                 

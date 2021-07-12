@@ -41,7 +41,6 @@ class MRP:
     def reset(self):
         """Return prediction grid and graph representation to their original form"""
         self.pred_grid = self.original_grid
-        self.G = self.to_graph()
           
     
     def init_pred_grid(self,init_strategy='zero'):

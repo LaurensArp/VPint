@@ -5,6 +5,7 @@ import numpy as np
 
 from .MRP import SMRP, STMRP
 from .SD_MRP import SD_SMRP, SD_STMRP
+from .utils.hide_spatial_data import hide_values_uniform
         
         
 class WP_SMRP(SMRP):
@@ -299,6 +300,20 @@ class WP_SMRP(SMRP):
                             c += 1
                             
         self.model.fit(X_train,y_train)
+        
+    def estimate_errors(self,hidden_prop=0.8):
+        # Compute errors at subsampled known cells
+        sub_grid = hide_values_uniform(self.original_grid.copy(),hidden_prop)
+        sub_MRP = WP_SMRP(sub_grid,self.feature_grid.copy(),None)
+        sub_pred_grid = sub_MRP.run(100,method="exact")
+        err_grid = np.abs(self.original_grid.copy() - sub_pred_grid)
+
+        # Predict errors for truly unknown cells
+        sub_MRP = SD_SMRP(err_grid)
+        err_gamma = sub_MRP.find_gamma(100,0.8,max_gamma=10)
+        err_grid_full = sub_MRP.run(100)
+        
+        return(err_grid_full)
         
         
     def visualise_weights(self,method="exact",aggregate=False):
