@@ -41,26 +41,8 @@ class WP_SMRP(SMRP):
         self.model = model 
         self.max_gamma = max_gamma
         self.min_gamma = min_gamma
-    
-    def estimate_confidence(self,confidence_model):
-        uncertainty_grid = self.original_grid.copy()
-        uncertainty_grid = uncertainty_grid / uncertainty_grid      
-
-        sub_MRP = WP_SMRP(uncertainty_grid,self.feature_grid.copy(),confidence_model)
-        sub_MRP.train()
-        confidence_pred_grid = sub_MRP.run(100)
-        
-        return(confidence_pred_grid)
-    
-    def estimate_confidence2(self):
-        uncertainty_grid = self.original_grid.copy()
-        uncertainty_grid = uncertainty_grid / uncertainty_grid      
-
-        sub_MRP = SD_SMRP(uncertainty_grid)
-        sub_MRP.find_gamma(100,0.5)
-        confidence_pred_grid = sub_MRP.run(100)
-        
-        return(confidence_pred_grid)
+        self._run_state = False
+        self._run_method = "predict"
     
             
     def run(self,iterations,method='predict',confidence=False,confidence_model=None):
@@ -162,17 +144,11 @@ class WP_SMRP(SMRP):
             new_grid[np.argwhere(~np.isnan(flattened_original))] = flattened_original[np.argwhere(~np.isnan(flattened_original))] # Keep known values from original
             
             new_grid = new_grid.reshape((height,width)) # Return to 2D grid
-            
 
-                     
-            
             self.pred_grid = new_grid
+            self.run_state = True
+            self.run_method = method
             
-        if(confidence):
-            #confidence_grid = self.estimate_confidence(confidence_model)
-            confidence_grid = self.estimate_confidence2()
-            return(self.pred_grid,confidence_grid)
-        else:
             return(self.pred_grid)
         
         
@@ -302,15 +278,16 @@ class WP_SMRP(SMRP):
         self.model.fit(X_train,y_train)
         
     def estimate_errors(self,hidden_prop=0.8):
+        
         # Compute errors at subsampled known cells
         sub_grid = hide_values_uniform(self.original_grid.copy(),hidden_prop)
         sub_MRP = WP_SMRP(sub_grid,self.feature_grid.copy(),None)
-        sub_pred_grid = sub_MRP.run(100,method="exact")
+        sub_pred_grid = sub_MRP.run(100,method=self.run_method)
         err_grid = np.abs(self.original_grid.copy() - sub_pred_grid)
 
         # Predict errors for truly unknown cells
         sub_MRP = SD_SMRP(err_grid)
-        err_gamma = sub_MRP.find_gamma(100,0.8,max_gamma=10)
+        err_gamma = sub_MRP.find_gamma(100,0.8,max_gamma=np.max(self.original_grid))
         err_grid_full = sub_MRP.run(100)
         
         return(err_grid_full)

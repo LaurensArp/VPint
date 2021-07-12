@@ -46,18 +46,6 @@ class SD_SMRP(SMRP):
         :param gamma: user-supplied gamma value
         """
         self.gamma = gamma
-    
-    
-    
-    def estimate_confidence(self):
-        uncertainty_grid = self.original_grid.copy()
-        uncertainty_grid = uncertainty_grid / uncertainty_grid      
-
-        sub_MRP = SD_SMRP(uncertainty_grid)
-        sub_MRP.find_gamma(100,0.5)
-        confidence_pred_grid = sub_MRP.run(100)
-        
-        return(confidence_pred_grid)
             
 
     def run(self,iterations,confidence=False):
@@ -205,24 +193,21 @@ class SD_SMRP(SMRP):
         self.gamma = best_gamma
         return(best_gamma)
         
-    def compute_confidence(self,iterations=100):
-        """
-        Gives a confidence indication (float 0-1) for all cells in the grid by
-        running a sub-MRP interpolation process on a grid where the confidence
-        for known values is set to 1.
+    def estimate_errors(self,hidden_prop=0.8):
         
-        :param iterations: number of iterations used for running the sub-MRP 
-        :returns: confidence indication per pixel
-        """
-        height = self.original_grid.shape[0]
-        width = self.original_grid.shape[1]
-        new_grid = np.zeros((height,width)) + 1
-        inds = np.isnan(self.original_grid)
-        new_grid[inds] = np.nan
+        # Compute errors at subsampled known cells
+        sub_grid = hide_values_uniform(self.original_grid.copy(),hidden_prop)
+        sub_MRP = SD_SMRP(sub_grid)
+        sub_MRP.set_gamma(self.gamma)
+        sub_pred_grid = sub_MRP.run(100)
+        err_grid = np.abs(self.original_grid.copy() - sub_pred_grid)
+
+        # Predict errors for truly unknown cells
+        sub_MRP = SD_SMRP(err_grid)
+        err_gamma = sub_MRP.find_gamma(100,0.8,max_gamma=np.max(self.original_grid))
+        err_grid_full = sub_MRP.run(100)
         
-        temp_MRP = SD_SMRP(new_grid,gamma=self.gamma)
-        confidence_grid = temp_MRP.run(iterations)
-        return(confidence_grid)
+        return(err_grid_full)
         
         
         
