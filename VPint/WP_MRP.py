@@ -299,6 +299,62 @@ class WP_SMRP(SMRP):
                             c += 1
                             
         self.model.fit(X_train,y_train)
+        
+        
+    def visualise_weights(self,method="exact",aggregate=False):
+        grid = self.feature_grid.copy()
+
+        height = grid.shape[0]
+        width = grid.shape[1]
+
+        if(not(aggregate)):
+            weight_grid = np.zeros(((height*3),(width*3)))
+        else:
+            weight_grid = np.zeros((height,width))
+
+        for i in range(0,height):
+            for j in range(0,width):
+                if(not(aggregate)):
+                    i_off = i*3+1
+                    j_off = j*3+1
+                    weight_grid[i_off,j_off] = np.nan
+                    weight_grid[i_off-1,j_off-1] = np.nan
+                    weight_grid[i_off-1,j_off+1] = np.nan
+                    weight_grid[i_off+1,j_off-1] = np.nan
+                    weight_grid[i_off+1,j_off+1] = np.nan
+                else:
+                    i_off = i
+                    j_off = j
+
+                div_count = 0
+                up = np.nan
+                left = np.nan
+                right = np.nan
+                down = np.nan
+                if(i > 0):
+                    up = self.predict_weight(grid[i-1,j,:],grid[i,j,:],method)
+                    div_count += 1
+                if(i < height-1):
+                    down = self.predict_weight(grid[i+1,j,:],grid[i,j,:],method)
+                    div_count += 1
+                if(j > 0):
+                    left = self.predict_weight(grid[i,j-1,:],grid[i,j,:],method)
+                    div_count += 1
+                if(j < width-1):
+                    right = self.predict_weight(grid[i,j+1,:],grid[i,j,:],method)
+                    div_count += 1
+                    
+                
+                if(not(aggregate)):
+                    weight_grid[i_off-1,j_off] = up
+                    weight_grid[i_off+1,j_off] = down
+                    weight_grid[i_off,j_off-1] = left
+                    weight_grid[i_off,j_off+1] = right
+                else:
+                    val = np.nansum(np.array([up,down,left,right])) - 1 # 0 should be most similar
+                    weight_grid[i,j] = val / div_count
+
+        return(weight_grid)
                         
                
         
@@ -372,38 +428,32 @@ class WP_STMRP(STMRP):
                         # Top
                         f1 = self.feature_grid[i-1,j,:]
                         f3 = np.array([0])
-                        f = np.concatenate((f1,f2,f3))
-                        vec[0] = self.predict_weight(f,method)
+                        vec[0] = self.predict_weight(f1,f2,f3,method)
                     if(j < w):
                         # Right
                         f1 = self.feature_grid[i,j+1,:]
                         f3 = np.array([0])
-                        f = np.concatenate((f1,f2,f3))
-                        vec[1] = self.predict_weight(f,method)
+                        vec[1] = self.predict_weight(f1,f2,f3,method)
                     if(i < h):
                         # Bottom
                         f1 = self.feature_grid[i+1,j,:]
                         f3 = np.array([0])
-                        f = np.concatenate((f1,f2,f3))
-                        vec[2] = self.predict_weight(f,method)
+                        vec[2] = self.predict_weight(f1,f2,f3,method)
                     if(j > 0):
                         # Left
                         f1 = self.feature_grid[i,j-1,:]
                         f3 = np.array([0])
-                        f = np.concatenate((f1,f2,f3))
-                        vec[3] = self.predict_weight(f,method)
+                        vec[3] = self.predict_weight(f1,f2,f3,method)
                     if(t > 0):
                         # Before
                         f1 = self.feature_grid[i,j,:]
                         f3 = np.array([-1])
-                        f = np.concatenate((f1,f2,f3))
-                        vec[4] = self.predict_weight(f,method)
+                        vec[4] = self.predict_weight(f1,f2,f3,method)
                     if(t < d):
                         # After
                         f1 = self.feature_grid[i,j,:]
                         f3 = np.array([1])
-                        f = np.concatenate((f1,f2,f3))
-                        vec[5] = self.predict_weight(f,method)
+                        vec[5] = self.predict_weight(f1,f2,f3,method)
 
                     weight_grid[i,j,t,:] = vec
         
@@ -475,7 +525,7 @@ class WP_STMRP(STMRP):
         return(self.pred_grid)
     
     
-    def predict_weight(self,f,method):
+    def predict_weight(self,f1,f2,f3,method):
         """
         Predict the weight between two cells based on feature vectors f1 and f2, using either self.model, cosine similarity or the average exact weight computed from the two feature vectors.
         
@@ -485,6 +535,7 @@ class WP_STMRP(STMRP):
         :returns: predicted weight gamma
         """
         if(method == "predict"):
+            f = np.concatenate((f1,f2,f3))
             f = f.reshape(1,len(f))
             if(f[0,-1] == -1 or f[0,-1] == 1):
                 gamma = self.model_temporal.predict(f)[0]

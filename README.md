@@ -16,3 +16,12 @@ was used to obtain results for the GDP and Covid datasets.
 
 To view the initial Master thesis associated with this code, please
 see: https://ada.liacs.nl/papers/ArpEtAl20b.pdf 
+
+When using this code for publications, please cite:
+
+    @mastersthesis{Arp2020Markov,
+        Author = {Arp, Laurens},
+        Title = {A Markov Reward Process-Based Approach to Spatial Interpolation},
+        Booktitle = {Master Thesis Computer Science},
+        Year = {2020}
+    }
