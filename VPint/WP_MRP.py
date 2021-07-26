@@ -37,7 +37,14 @@ class WP_SMRP(SMRP):
     
     def __init__(self,grid,feature_grid,model,init_strategy='mean',max_gamma=np.inf,min_gamma=0):       
         super().__init__(grid,init_strategy=init_strategy)
-        self.feature_grid = feature_grid.copy().astype(float)
+        if(len(feature_grid.shape) == 3):
+            self.feature_grid = feature_grid.copy().astype(float)
+        elif(len(feature_grid.shape) == 2):
+            self.feature_grid = feature_grid.copy().astype(float).reshape((feature_grid.shape[0],
+                                                                          feature_grid.shape[1],
+                                                                          1))
+        else:
+            print("WARNING: Improper feature dimensions; expected 2 or 3, got " + str(len(feature_grid.shape)))
         self.model = model 
         self.max_gamma = max_gamma
         self.min_gamma = min_gamma
@@ -284,6 +291,7 @@ class WP_SMRP(SMRP):
         sub_MRP = WP_SMRP(sub_grid,self.feature_grid.copy(),None)
         sub_pred_grid = sub_MRP.run(100,method=self.run_method)
         err_grid = np.abs(self.original_grid.copy() - sub_pred_grid)
+        # TODO replace known values
 
         # Predict errors for truly unknown cells
         sub_MRP = SD_SMRP(err_grid)
