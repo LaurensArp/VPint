@@ -156,7 +156,7 @@ class WP_SMRP(SMRP):
             self.run_state = True
             self.run_method = method
             
-            return(self.pred_grid)
+        return(self.pred_grid)
         
         
     def predict_weight(self,f1,f2,method):
