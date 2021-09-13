@@ -171,7 +171,12 @@ class WP_SMRP(SMRP):
         if(method == "predict"):
             f = np.concatenate((f1,f2))
             f = f.reshape(1,len(f))
-            gamma = self.model.predict(f)[0]
+            # TODO: better solution
+            gamma = 1.0
+            try:
+                gamma = self.model.predict(f)[0]
+            except:
+                gamma = 1.0
             gamma = max(self.min_gamma,min(gamma,self.max_gamma))
         elif(method == "cosine_similarity"):
             gamma = np.dot(f1,f2) / max(np.sum(f1) * np.sum(f2),0.01)

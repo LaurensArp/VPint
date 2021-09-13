@@ -287,6 +287,13 @@ class WP_SMRP(SMRP):
                             y_train[c] = gamma
                             c += 1
                             
+                            
+        aug = np.append(X_train,y_train.reshape((len(y_train),1)),axis=1)
+        aug = aug[~np.isnan(aug).any(axis=1),:]
+        
+        X_train = aug[:,0:-1]
+        y_train = aug[:,-1]
+        
         self.model.fit(X_train,y_train)
         
     def estimate_errors(self,hidden_prop=0.8):
