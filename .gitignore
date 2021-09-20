@@ -23,5 +23,8 @@ run_smac.py
 # Results
 results/
 
+# Build
+build/
+
 # Autosklearn output
 autosklearn/
