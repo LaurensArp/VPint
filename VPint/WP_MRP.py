@@ -35,7 +35,7 @@ class WP_SMRP(SMRP):
         compute an indication of uncertainty per pixel in pred_grid
     """    
     
-    def __init__(self,grid,feature_grid,model,init_strategy='mean',max_gamma=np.inf,min_gamma=0):       
+    def __init__(self,grid,feature_grid,model=None,init_strategy='mean',max_gamma=np.inf,min_gamma=0):       
         super().__init__(grid,init_strategy=init_strategy)
         if(len(feature_grid.shape) == 3):
             self.feature_grid = feature_grid.copy().astype(float)
@@ -177,7 +177,6 @@ class WP_SMRP(SMRP):
                 gamma = self.model.predict(f)[0]
             except:
                 gamma = 1.0
-            gamma = max(self.min_gamma,min(gamma,self.max_gamma))
         elif(method == "cosine_similarity"):
             gamma = np.dot(f1,f2) / max(np.sum(f1) * np.sum(f2),0.01)
         elif(method == "exact"):
@@ -187,6 +186,7 @@ class WP_SMRP(SMRP):
         else:
             print("Invalid method")
             intentionalcrash # TODO: start throwing proper exceptions...
+        gamma = max(self.min_gamma,min(gamma,self.max_gamma))
         return(gamma)
         
         
