@@ -11,11 +11,11 @@ def tiff_to_numpy(path):
         vals = np.moveaxis(fp.read().astype(np.float64),0,-1)
     return(vals)
 
-def multiband_VPint(target_img,feature_img,independent=True,iterations=100,method='exact',max_gamma=np.inf):
-    """Function to run VPint (WP-MRP) on all bands"""
+def multiband_VPint(target_img,feature_img,iterations=100,method='exact',max_gamma=np.inf,min_gamma=0):
+    """Function to run VPint (WP-MRP) on all bands independently"""
     pred_img = target_img.copy()
     for b in range(target_img.shape[2]):
-        MRP = WP_SMRP(target_img[:,:,b],feature_img[:,:,b],max_gamma=max_gamma)
+        MRP = WP_SMRP(target_img[:,:,b],feature_img[:,:,b],max_gamma=max_gamma,min_gamma=min_gamma)
         pred_img[:,:,b] = MRP.run(iterations,method=method)
     return(pred_img)
 
@@ -36,13 +36,18 @@ def apply_cloud_mask(target_img,mask,threshold=None):
 
 def rgb_composite(inp,max_val=-1,title="",brightness=1.0,rgb=[3,2,1]):
     """Plot an RGB composite of a multi-band optical image"""
-    if(max_val == -1):
-        max_val = np.nanmax(inp)
         
     img = np.zeros((inp.shape[0],inp.shape[1],3))
-    img[:,:,0] = inp[:,:,rgb[0]] / max_val * 255
-    img[:,:,1] = inp[:,:,rgb[1]] / max_val * 255
-    img[:,:,2] = inp[:,:,rgb[2]] / max_val * 255
+    img[:,:,0] = inp[:,:,rgb[0]]
+    img[:,:,1] = inp[:,:,rgb[1]]
+    img[:,:,2] = inp[:,:,rgb[2]]
+    
+    if(max_val == -1):
+        max_val = np.nanmax(inp)
+    
+    img[:,:,0] = img[:,:,0] / max_val * 255
+    img[:,:,1] = img[:,:,1] / max_val * 255
+    img[:,:,2] = img[:,:,2] / max_val * 255
     
     img = np.clip(img*brightness,0,255)
     

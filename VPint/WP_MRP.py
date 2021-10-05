@@ -52,14 +52,22 @@ class WP_SMRP(SMRP):
         self._run_method = "predict"
     
             
-    def run(self,iterations,method='predict',confidence=False,confidence_model=None):
+    def run(self,iterations=-1,method='predict',auto_terminate=True,auto_terminate_threshold=1e-4,track_delta=False, confidence=False,confidence_model=None):
         """
         Runs WP-SMRP for the specified number of iterations. Creates a 3D (h,w,4) tensor val_grid, where the z-axis corresponds to a neighbour of each cell, and a 3D (h,w,4) weight tensor weight_grid, where the z-axis corresponds to the weights of every neighbour in val_grid's z-axis. The x and y axes of both tensors are stacked into 2D (h*w,4) matrices (one of which is transposed), after which the dot product is taken between both matrices, resulting in a (h*w,h*w) matrix. As we are only interested in multiplying the same row numbers with the same column numbers, we take the diagonal entries of the computed matrix to obtain a 1D (h*w) vector of updated values (we use numpy's einsum to do this efficiently, without wasting computation on extra dot products). This vector is then divided element-wise by a vector (flattened 2D grid) counting the number of neighbours of each cell, and we use the object's original_grid to replace wrongly updated known values to their original true values. We finally reshape this vector back to the original 2D pred_grid shape of (h,w).
         
-        :param iterations: number of iterations used for the state value update function. If not specified, terminate once the maximal difference of a cell update dips below termination_threshold
+        :param iterations: number of iterations used for the state value update function. If not specified, default to 10000, which functions as the maximum number of iterations in case of non-convergence
         :param method: method for computing weights. Options: "predict" (using self.model), "cosine_similarity" (based on feature similarity), "exact" (compute average weight exactly for features)
+        :param auto_terminate: if True, automatically terminate once the mean change in values after calling the update rule converges to a value under the auto_termination_threshold. Capped at 10000 iterations by default, though it usually takes under 100 iterations to converge
+        :param auto_terminate_threshold: threshold for the amount of change as a proportion of the mean value of the grid, after which the algorithm automatically terminates
+        :param track_delta: if True, return a vector containing the evolution of delta (mean proportion of change per iteration) along with the interpolated grid
         :returns: interpolated grid pred_grid
         """
+        
+        if(iterations > -1):
+            auto_terminate = False
+        else:
+            iterations = 10000
                
         # Setup all this once
         
@@ -118,6 +126,9 @@ class WP_SMRP(SMRP):
         
         neighbour_count_vec = neighbour_count_grid.reshape(width*height)
         
+        if(track_delta):
+            delta_vec = np.zeros(iterations)
+        
         # Main loop
         
         for it in range(0,iterations):
@@ -151,12 +162,26 @@ class WP_SMRP(SMRP):
             new_grid[np.argwhere(~np.isnan(flattened_original))] = flattened_original[np.argwhere(~np.isnan(flattened_original))] # Keep known values from original
             
             new_grid = new_grid.reshape((height,width)) # Return to 2D grid
+            
+            if(track_delta or auto_terminate):
+                delta = np.nanmean(np.absolute(new_grid-self.pred_grid)) / np.nanmean(self.pred_grid)
+                if(track_delta):
+                    delta_vec[it] = delta
+                if(auto_terminate):
+                    if(delta <= auto_terminate_threshold):
+                        self.pred_grid = new_grid
+                        delta_vec = delta_vec[0:it+1]
+                        break
 
             self.pred_grid = new_grid
-            self.run_state = True
-            self.run_method = method
             
-        return(self.pred_grid)
+        self.run_state = True
+        self.run_method = method
+            
+        if(track_delta):
+            return(self.pred_grid,delta_vec)
+        else:
+            return(self.pred_grid)
         
         
     def predict_weight(self,f1,f2,method):
@@ -190,7 +215,7 @@ class WP_SMRP(SMRP):
         return(gamma)
         
         
-    def train(self,training_set=None,training_features=None):
+    def train(self,training_set=None,training_features=None,limit_training=True):
         
         if(training_set is None or training_features is None):
             training_set = self.original_grid.copy()
@@ -250,6 +275,8 @@ class WP_SMRP(SMRP):
                             f = np.concatenate((f1,f2))
                             f = f.reshape(1,len(f))
                             gamma = y2 / max(0.01,y1)
+                            if(limit_training):
+                                gamma = max(self.min_gamma,min(gamma,self.max_gamma))
                             X_train[c,:] = f
                             y_train[c] = gamma
                             c += 1
@@ -261,6 +288,8 @@ class WP_SMRP(SMRP):
                             f = np.concatenate((f1,f2))
                             f = f.reshape(1,len(f))
                             gamma = y2 / max(0.01,y1)
+                            if(limit_training):
+                                gamma = max(self.min_gamma,min(gamma,self.max_gamma))
                             X_train[c,:] = f
                             y_train[c] = gamma
                             c += 1                        
@@ -272,6 +301,8 @@ class WP_SMRP(SMRP):
                             f = np.concatenate((f1,f2))
                             f = f.reshape(1,len(f))
                             gamma = y2 / max(0.01,y1)
+                            if(limit_training):
+                                gamma = max(self.min_gamma,min(gamma,self.max_gamma))
                             X_train[c,:] = f
                             y_train[c] = gamma
                             c += 1  
@@ -283,6 +314,8 @@ class WP_SMRP(SMRP):
                             f = np.concatenate((f1,f2))
                             f = f.reshape(1,len(f))
                             gamma = y2 / max(0.01,y1)
+                            if(limit_training):
+                                gamma = max(self.min_gamma,min(gamma,self.max_gamma))
                             X_train[c,:] = f
                             y_train[c] = gamma
                             c += 1
