@@ -33,13 +33,14 @@ def run_experiments_2D(grid_true,f_grid,alg,iterations,params,hidden_method="ran
             MRP.find_gamma(params["SD_epochs"],params["subsample_proportion"],
                           sub_iterations=params["sub_iterations"])
             tt = time.time()
-            pred_grid = MRP.run(params["iterations"])
+            pred_grid = MRP.run(iterations=params["iterations"],auto_terminate=params["auto_iter"])
             rt = time.time()
         elif(alg == "WP_MRP"):
-            MRP = WP_SMRP(grid,f_grid,params["model"])
-            MRP.train()
+            MRP = WP_SMRP(grid,f_grid,model=params["model"])
+            if(params["method"] == "predict"):
+                MRP.train()
             tt = time.time()
-            pred_grid = MRP.run(params["iterations"])
+            pred_grid = MRP.run(iterations=params["iterations"],auto_terminate=params["auto_iter"],method=params["method"])
             rt = time.time()
         elif(alg == "OK"):
             tt = time.time()
@@ -116,13 +117,14 @@ def run_experiments_3D(grid_true,f_grid,alg,iterations,params,hidden_method="ran
             MRP.find_discounts(params["SD_epochs"],params["subsample_proportion"],
                           sub_iterations=params["sub_iterations"])
             tt = time.time()
-            pred_grid = MRP.run(params["iterations"])
+            pred_grid = MRP.run(iterations=params["iterations"],auto_terminate=params["auto_iter"])
             rt = time.time()
         elif(alg == "WP_MRP"):
-            MRP = WP_STMRP(grid,f_grid,params["model"])
-            MRP.train()
+            MRP = WP_STMRP(grid,f_grid,model=params["model"])
+            if(params["method"] == "predict"):
+                MRP.train()
             tt = time.time()
-            pred_grid = MRP.run(params["iterations"])
+            pred_grid = MRP.run(iterations=params["iterations"],auto_terminate=params["auto_iter"],method=params["method"])
             rt = time.time()
         elif(alg == "OK"):
             tt = time.time()

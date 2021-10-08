@@ -438,7 +438,7 @@ class WP_STMRP(STMRP):
         self.min_gamma = min_gamma
         
         
-    def run(self,iterations,method='predict'):
+    def run(self,iterations=-1,method='predict',auto_terminate=True,auto_terminate_threshold=1e-4,track_delta=False):
         """
         Runs WP-STMRP for the specified number of iterations. Creates a 4D (h,w,t,6) tensor val_grid, where the 4th axis corresponds to a neighbour of each cell, and a 4D (h,w,t,6) weight tensor weight_grid, where the 4th axis corresponds to the weights of every neighbour in val_grid's 4th axis. The x and y axes of both tensors are stacked into 2D (h*w*t,6) matrices (one of which is transposed), after which the dot product is taken between both matrices, resulting in a (h*w,h*w) matrix. As we are only interested in multiplying the same row numbers with the same column numbers, we take the diagonal entries of the computed matrix to obtain a 1D (h*w*t) vector of updated values (we use numpy's einsum to do this efficiently, without wasting computation on extra dot products). This vector is then divided element-wise by a vector (flattened 3D grid) counting the number of neighbours of each cell, and we use the object's original_grid to replace wrongly updated known values to their original true values. We finally reshape this vector back to the original 3D pred_grid shape of (h,w,t).
         
@@ -446,9 +446,13 @@ class WP_STMRP(STMRP):
         :returns: interpolated grid pred_grid
         """
 
-        # This one would also work for WP-MRP
-        
+       
         # Setup all this once
+        
+        if(iterations > -1):
+            auto_terminate = False
+        else:
+            iterations = 10000
         
         height = self.pred_grid.shape[0]
         width = self.pred_grid.shape[1]
@@ -525,7 +529,10 @@ class WP_STMRP(STMRP):
                     neighbour_count_grid[i,j,t] = nc
 
         
-        neighbour_count_vec = neighbour_count_grid.reshape(width*height*depth) # TODO: verify that this is correct
+        neighbour_count_vec = neighbour_count_grid.reshape(width*height*depth)
+        
+        if(track_delta):
+            delta_vec = np.zeros(iterations)
         
         # Main loop
         
@@ -565,9 +572,23 @@ class WP_STMRP(STMRP):
             flattened_original = self.original_grid.copy().reshape((height*width*depth)) # can't use argwhere with 3D indexing
             new_grid[np.argwhere(~np.isnan(flattened_original))] = flattened_original[np.argwhere(~np.isnan(flattened_original))] # Keep known values from original
             new_grid = new_grid.reshape((height,width,depth)) # Return to 2D grid
+            
+            if(track_delta or auto_terminate):
+                delta = np.nanmean(np.absolute(new_grid-self.pred_grid)) / np.nanmean(self.pred_grid)
+                if(track_delta):
+                    delta_vec[it] = delta
+                if(auto_terminate):
+                    if(delta <= auto_terminate_threshold):
+                        self.pred_grid = new_grid
+                        delta_vec = delta_vec[0:it+1]
+                        break
 
             self.pred_grid = new_grid
-        return(self.pred_grid)
+            
+        if(track_delta):
+            return(self.pred_grid,delta_vec)
+        else:
+            return(self.pred_grid)
     
     
     def predict_weight(self,f1,f2,f3,method):
