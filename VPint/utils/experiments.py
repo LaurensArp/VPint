@@ -11,6 +11,8 @@ import time
 import numpy as np
 import os
 
+from math import log10, sqrt
+
 def run_experiments_2D(grid_true,f_grid,alg,iterations,params,hidden_method="random",save=False):
 
     result_grids = np.zeros((iterations,grid_true.shape[0],grid_true.shape[1]))
@@ -82,14 +84,15 @@ def run_experiments_2D(grid_true,f_grid,alg,iterations,params,hidden_method="ran
         else:
             print("Invalid algorithm")
     
+        measures = compute_measures(pred_grid,grid_true,grid)
         runtimes[it] = float(rt-st)
         result_grids[it,:,:] = pred_grid
-        mae = np.mean(np.absolute(pred_grid-grid_true))
+        #mae = np.mean(np.absolute(pred_grid-grid_true))
         train_time = float(tt-st)
         run_time = float(rt-tt)
         
         if(save):
-            save_results(mae,train_time,run_time,params)
+            save_results(measures,train_time,run_time,params)
         
     return(result_grids,runtimes)
 
@@ -166,22 +169,81 @@ def run_experiments_3D(grid_true,f_grid,alg,iterations,params,hidden_method="ran
         else:
             print("Invalid algorithm")
     
+        measures = compute_measures(pred_grid,grid_true,grid)
         et = time.time()
         runtimes[it] = float(rt-st)
         result_grids[it,:,:,:] = pred_grid
-        mae = np.mean(np.absolute(pred_grid-grid_true))
+        #mae = np.mean(np.absolute(pred_grid-grid_true))
         train_time = float(tt-st)
         run_time = float(rt-tt)
         
         if(save):
-            save_results(mae,train_time,run_time,params)
+            save_results(measures,train_time,run_time,params)
         
     return(result_grids,runtimes)
 
 
-def save_results(mae,train_time,run_time,params):
+def compute_measures(pred,true,mask):
+    
+    # MAE
+    diff = np.absolute(true-pred)
+
+    flattened_mask = mask.copy().reshape((np.prod(mask.shape)))
+    flattened_diff = diff.reshape((np.prod(diff.shape)))[np.isnan(flattened_mask)]
+
+    mae = np.nanmean(flattened_diff)
+    
+    # RMSE
+    diff = true-pred
+
+    flattened_mask = mask.copy().reshape((np.prod(mask.shape)))
+    flattened_diff = diff.reshape((np.prod(diff.shape)))[np.isnan(flattened_mask)]
+
+    rmse = np.mean(np.square(flattened_diff))
+
+    # PSNR
+    # Based on https://www.geeksforgeeks.org/python-peak-signal-to-noise-ratio-psnr/
+    flattened_mask = mask.copy().reshape((np.prod(mask.shape)))
+    flattened_true = true.reshape((np.prod(true.shape)))[np.isnan(flattened_mask)]
+    flattened_pred = pred.reshape((np.prod(pred.shape)))[np.isnan(flattened_mask)]
+
+    mse2 = np.nanmean((flattened_true - flattened_pred) ** 2) + 0.001 # 0.001 for smoothing
+
+    if(mse2 == 0):
+        return(1)
+    max_pixel = 255.0
+    psnr = 20 * log10(max_pixel / sqrt(mse2)) / 100 # /100 because I want 0-1
+
+    # SSIM
+    flattened_mask = mask.copy().reshape((np.prod(mask.shape)))
+    flattened_true = true.reshape((np.prod(true.shape)))[np.isnan(flattened_mask)]
+    flattened_pred = pred.reshape((np.prod(pred.shape)))[np.isnan(flattened_mask)]
+
+    try:
+        from skimage.measure import compare_ssim
+        (s,d) = compare_ssim(flattened_true,flattened_pred,full=True)
+    except:
+        print("Error running compare_ssim. For this functionality, please ensure that scikit-image is installed.")
+        s = np.nan
+
+    ssim = s
+    
+    # Return
+    return([mae,rmse,psnr,ssim])
+
+
+def save_results(measures,train_time,run_time,params):
     save_path = params["save_path"]
 
+    mae = measures[0]
+    rmse = measures[1]
+    psnr = measures[2]
+    ssim = measures[3]
+    
+    if(not(os.exists(save_path))):
+        with open(save_path,'w') as fp:
+            s = "mae,rmse,psnr,ssim,train_time,run_time\n"
+            fp.write(s)
             
     with open(save_path,'a') as fp:
         s = str(mae) + "," + str(train_time) + "," + str(run_time) + "\n"
