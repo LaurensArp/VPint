@@ -1,4 +1,4 @@
-from utils.hide_spatial_data import hide_values_uniform,hide_values_sim_cloud
+from VPint.utils.hide_spatial_data import hide_values_uniform,hide_values_sim_cloud
 
 def hide_values_uniform_3D(grid,hidden_proportion):
     new_grid = grid.copy()

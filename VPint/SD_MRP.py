@@ -146,7 +146,8 @@ class SD_SMRP(SMRP):
                 if(auto_terminate):
                     if(delta <= auto_terminate_threshold):
                         self.pred_grid = new_grid
-                        delta_vec = delta_vec[0:it+1]
+                        if(track_delta):
+                            delta_vec = delta_vec[0:it+1]
                         break
             
             self.pred_grid = new_grid
@@ -397,7 +398,8 @@ class SD_STMRP(STMRP):
                 if(auto_terminate):
                     if(delta <= auto_terminate_threshold):
                         self.pred_grid = new_grid
-                        delta_vec = delta_vec[0:it+1]
+                        if(track_delta):
+                            delta_vec = delta_vec[0:it+1]
                         break
             
             self.pred_grid = new_grid

@@ -1,6 +1,6 @@
 import os
 import numpy as np
-from utils.generate_spatial_data import *
+from VPint.utils.generate_spatial_data import *
 
 
 

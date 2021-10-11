@@ -3,6 +3,7 @@
 
 import numpy as np
 import datetime
+from math import log10, sqrt
 
 class MRP:
     """
@@ -142,6 +143,65 @@ class MRP:
             
         return(r_squared)
     
+    def MAE(self,true):
+        pred = self.pred_grid.copy()
+        mask = self.original_grid.copy()
+        
+        diff = np.absolute(true-pred)
+
+        flattened_mask = mask.copy().reshape((np.prod(mask.shape)))
+        flattened_diff = diff.reshape((np.prod(diff.shape)))[np.isnan(flattened_mask)]
+
+        mae = np.nanmean(flattened_diff)
+        return(mae)
+    
+    
+    def RMSE(self,true):
+        pred = self.pred_grid.copy()
+        mask = self.original_grid.copy()
+        
+        diff = true-pred
+        
+        flattened_mask = mask.copy().reshape((np.prod(mask.shape)))
+        flattened_diff = diff.reshape((np.prod(diff.shape)))[np.isnan(flattened_mask)]
+        
+        rmse = np.mean(np.square(flattened_diff))
+        return(rmse)
+        
+
+    def PSNR(self,true):
+        # Based on https://www.geeksforgeeks.org/python-peak-signal-to-noise-ratio-psnr/
+        pred = self.pred_grid.copy()
+        mask = self.original_grid.copy()
+        
+        flattened_mask = mask.copy().reshape((np.prod(mask.shape)))
+        flattened_true = true.reshape((np.prod(true.shape)))[np.isnan(flattened_mask)]
+        flattened_pred = pred.reshape((np.prod(pred.shape)))[np.isnan(flattened_mask)]
+
+        mse = np.nanmean((flattened_true - flattened_pred) ** 2) + 0.001 # 0.001 for smoothing
+
+        if(mse == 0):
+            return(1)
+        max_pixel = 255.0
+        psnr = 20 * log10(max_pixel / sqrt(mse)) / 100 # /100 because I want 0-1
+        return(psnr)
+
+    def SSIM(self,true):
+        pred = self.pred_grid.copy()
+        mask = self.original_grid.copy()
+
+        flattened_mask = mask.copy().reshape((np.prod(mask.shape)))
+        flattened_true = true.reshape((np.prod(true.shape)))[np.isnan(flattened_mask)]
+        flattened_pred = pred.reshape((np.prod(pred.shape)))[np.isnan(flattened_mask)]
+
+        try:
+            from skimage.measure import compare_ssim
+            (s,d) = compare_ssim(flattened_true,flattened_pred,full=True)
+        except:
+            print("Error running compare_ssim. For this functionality, please ensure that scikit-image is installed.")
+            s = np.nan
+        return(s)
+    
 
 class SMRP(MRP):
     """
@@ -168,11 +228,11 @@ class SMRP(MRP):
     
     def __init__(self,grid,init_strategy='mean'):
         super().__init__(grid,init_strategy=init_strategy)
-    
+
     
     def mean_absolute_error(self,true_grid,scale_factor=1,gridded=False):
         """
-        Compute the mean absolute error of pred_grid given true_grid as ground truth
+        Compute the mean absolute error of pred_grid given true_grid as ground truth. Old code.
         
         :param true_grid: ground truth for all grid cells
         :param gridded: optional Boolean specifying whether to return an error grid with the MAE

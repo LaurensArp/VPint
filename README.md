@@ -8,6 +8,9 @@ Dependencies:
 - Python            3.6.12
 - Numpy             1.19.0
 
+Optional depdendencies:
+- Scikit-image      0.17.2
+
 For reproducibility purposes, see "legacy" code. This implementation
 used a functionally equivalent graph-based implementation of our methods, 
 which was inefficient in terms of running time. The legacy code also
