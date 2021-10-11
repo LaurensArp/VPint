@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(name='VPint',
-      version='0.2.2',
+      version='0.2.3',
       description='Value propagation-based spatial and spatio-temporal interpolation',
       url='https://github.com/LaurensArp/VPint',
       author='Laurens Arp',
