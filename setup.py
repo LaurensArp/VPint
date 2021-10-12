@@ -11,4 +11,5 @@ setup(name='VPint',
       install_requires=[
           'numpy',
       ],
+      include_package_data=True,
       zip_safe=False)

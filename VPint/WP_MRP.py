@@ -427,7 +427,7 @@ class WP_STMRP(STMRP):
     train():
         Train supplied prediction model on subsampled data or a training set
     """    
-    def __init__(self,grid,feature_grid,model_spatial,model_temporal,auto_timesteps=False,max_gamma=np.inf,min_gamma=0):
+    def __init__(self,grid,feature_grid,model_spatial=None,model_temporal=None,auto_timesteps=False,max_gamma=np.inf,min_gamma=0):
         # Feature grid is a 3d grid, where x and y correspond to grid, and the z axis contains feature
         # vectors
         

@@ -46,39 +46,39 @@ def run_experiments_2D(grid_true,f_grid,alg,iterations,params,hidden_method="ran
             rt = time.time()
         elif(alg == "OK"):
             tt = time.time()
-            pred_grid, var_grid = utils.baselines_2D.ordinary_kriging(grid,params["variogram_model"])
+            pred_grid, var_grid = VPint.utils.baselines_2D.ordinary_kriging(grid,params["variogram_model"])
             rt = time.time()
         elif(alg == "UK"):
             tt = time.time()
-            pred_grid, var_grid = utils.baselines_2D.universal_kriging(grid,params["variogram_model"])
+            pred_grid, var_grid = VPint.utils.baselines_2D.universal_kriging(grid,params["variogram_model"])
             rt = time.time()
         elif(alg == "basic"):
-            model = utils.baselines_2D.regression_train(grid,f_grid,params["model"])
+            model = VPint.utils.baselines_2D.regression_train(grid,f_grid,params["model"])
             tt = time.time()
-            pred_grid = utils.baselines_2D.regression_run(grid,f_grid,model)
+            pred_grid = VPint.utils.baselines_2D.regression_run(grid,f_grid,model)
             rt = time.time()
         elif(alg == "SAR"):
-            model = utils.baselines_2D.SAR_train(grid,f_grid,params["model"])
+            model = VPint.utils.baselines_2D.SAR_train(grid,f_grid,params["model"])
             tt = time.time()
-            pred_grid = utils.baselines_2D.SAR_run(grid,f_grid,model)
+            pred_grid = VPint.utils.baselines_2D.SAR_run(grid,f_grid,model)
             rt = time.time()
         elif(alg == "MA"):
-            model, sub_model, sub_error_grid = utils.baselines_2D.MA_train(grid,f_grid,params["model"],params["sub_model"])
+            model, sub_model, sub_error_grid = VPint.utils.baselines_2D.MA_train(grid,f_grid,params["model"],params["sub_model"])
             tt = time.time()
-            pred_grid = utils.baselines_2D.MA_run(grid,f_grid,model,sub_model,sub_error_grid)
+            pred_grid = VPint.utils.baselines_2D.MA_run(grid,f_grid,model,sub_model,sub_error_grid)
             rt = time.time()
         elif(alg == "ARMA"):
-            model, sub_model, sub_error_grid = utils.baselines_2D.ARMA_train(grid,f_grid,params["model"],params["sub_model"])
+            model, sub_model, sub_error_grid = VPint.utils.baselines_2D.ARMA_train(grid,f_grid,params["model"],params["sub_model"])
             tt = time.time()
-            pred_grid = utils.baselines_2D.ARMA_run(grid,f_grid,model,sub_model,sub_error_grid)
+            pred_grid = VPint.utils.baselines_2D.ARMA_run(grid,f_grid,model,sub_model,sub_error_grid)
             rt = time.time()
         elif(alg == "CNN"):
-            model = utils.baselines_2D.CNN_train_pixel(grid,f_grid,params["nn_model"],max_trials=params["nn_max_trials"],
+            model = VPint.utils.baselines_2D.CNN_train_pixel(grid,f_grid,params["nn_model"],max_trials=params["nn_max_trials"],
                                     epochs=params["nn_epochs"],train_fill=params["nn_train_fill"],
                                    window_height=params["nn_window_height"],
                                     window_width=params["nn_window_width"])
             tt = time.time()
-            pred_grid = utils.baselines_2D.CNN_run_pixel(grid,f_grid,model,window_height=params["nn_window_height"],
+            pred_grid = VPint.utils.baselines_2D.CNN_run_pixel(grid,f_grid,model,window_height=params["nn_window_height"],
                                       window_width=params["nn_window_width"])
             rt = time.time()
         else:
@@ -123,7 +123,7 @@ def run_experiments_3D(grid_true,f_grid,alg,iterations,params,hidden_method="ran
             pred_grid = MRP.run(iterations=params["iterations"],auto_terminate=params["auto_iter"])
             rt = time.time()
         elif(alg == "WP_MRP"):
-            MRP = WP_STMRP(grid,f_grid,model=params["model"])
+            MRP = WP_STMRP(grid,f_grid,model_spatial=params["model_spatial"],model_temporal=params["model_temporal"])
             if(params["method"] == "predict"):
                 MRP.train()
             tt = time.time()
@@ -131,39 +131,39 @@ def run_experiments_3D(grid_true,f_grid,alg,iterations,params,hidden_method="ran
             rt = time.time()
         elif(alg == "OK"):
             tt = time.time()
-            pred_grid, var_grid = utils.baselines_3D.ordinary_kriging(grid,params["variogram_model"])
+            pred_grid, var_grid = VPint.utils.baselines_3D.ordinary_kriging(grid,params["variogram_model"])
             rt = time.time()
         elif(alg == "UK"):
             tt = time.time()
-            pred_grid, var_grid = utils.baselines_3D.universal_kriging(grid,params["variogram_model"])
+            pred_grid, var_grid = VPint.utils.baselines_3D.universal_kriging(grid,params["variogram_model"])
             rt = time.time()
         elif(alg == "basic"):
-            model = utils.baselines_3D.regression_train(grid,f_grid,params["model"])
+            model = VPint.utils.baselines_3D.regression_train(grid,f_grid,params["model"])
             tt = time.time()
-            pred_grid = utils.baselines_3D.regression_run(grid,f_grid,model)
+            pred_grid = VPint.utils.baselines_3D.regression_run(grid,f_grid,model)
             rt = time.time()
         elif(alg == "SAR"):
-            model = utils.baselines_3D.SAR_train(grid,f_grid,params["model"])
+            model = VPint.utils.baselines_3D.SAR_train(grid,f_grid,params["model"])
             tt = time.time()
-            pred_grid = utils.baselines_3D.SAR_run(grid,f_grid,model)
+            pred_grid = VPint.utils.baselines_3D.SAR_run(grid,f_grid,model)
             rt = time.time()
         elif(alg == "MA"):
-            model, sub_model, sub_error_grid = utils.baselines_3D.MA_train(grid,f_grid,params["model"],params["sub_model"])
+            model, sub_model, sub_error_grid = VPint.utils.baselines_3D.MA_train(grid,f_grid,params["model"],params["sub_model"])
             tt = time.time()
-            pred_grid = utils.baselines_3D.MA_run(grid,f_grid,model,sub_model,sub_error_grid)
+            pred_grid = VPint.utils.baselines_3D.MA_run(grid,f_grid,model,sub_model,sub_error_grid)
             rt = time.time()
         elif(alg == "ARMA"):
-            model, sub_model, sub_error_grid = utils.baselines_3D.ARMA_train(grid,f_grid,params["model"],params["sub_model"])
+            model, sub_model, sub_error_grid = VPint.utils.baselines_3D.ARMA_train(grid,f_grid,params["model"],params["sub_model"])
             tt = time.time()
-            pred_grid = utils.baselines_3D.ARMA_run(grid,f_grid,model,sub_model,sub_error_grid)
+            pred_grid = VPint.utils.baselines_3D.ARMA_run(grid,f_grid,model,sub_model,sub_error_grid)
             rt = time.time()
         elif(alg == "CNN"):
-            model = utils.baselines_3D.CNN_train_pixel(grid,f_grid,params["nn_model"],max_trials=params["nn_max_trials"],
+            model = VPint.utils.baselines_3D.CNN_train_pixel(grid,f_grid,params["nn_model"],max_trials=params["nn_max_trials"],
                                     epochs=params["nn_epochs"],train_fill=params["nn_train_fill"],
                                    window_height=params["nn_window_height"],
                                     window_width=params["nn_window_width"])
             tt = time.time()
-            pred_grid = utils.baselines_3D.CNN_run_pixel(grid,f_grid,model,window_height=params["nn_window_height"],
+            pred_grid = VPint.utils.baselines_3D.CNN_run_pixel(grid,f_grid,model,window_height=params["nn_window_height"],
                                       window_width=params["nn_window_width"])
             rt = time.time()
         else:
@@ -240,13 +240,13 @@ def save_results(measures,train_time,run_time,params):
     psnr = measures[2]
     ssim = measures[3]
     
-    if(not(os.exists(save_path))):
+    if(not(os.path.exists(save_path))):
         with open(save_path,'w') as fp:
             s = "mae,rmse,psnr,ssim,train_time,run_time\n"
             fp.write(s)
             
     with open(save_path,'a') as fp:
-        s = str(mae) + "," + str(train_time) + "," + str(run_time) + "\n"
+        s = str(mae) + "," + str(rmse) + "," + str(psnr) + "," + str(ssim) + "," + str(train_time) + "," + str(run_time) + "\n"
         fp.write(s)
 
 
