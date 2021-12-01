@@ -54,6 +54,8 @@ def regression_train(grid,f_grid,model):
     width = grid.shape[1]
 
     training_size = (~np.isnan(grid)).sum()
+    if(training_size == 0):
+        return(False)
     num_features = f_grid.shape[2]
 
     X_train = np.zeros((training_size,num_features))
@@ -126,6 +128,8 @@ def SAR_train(grid,f_grid,model):
     width = grid.shape[1]
 
     training_size = (~np.isnan(grid)).sum()
+    if(training_size == 0):
+        return(False)
     num_features = f_grid.shape[2] + 4
 
     X_train = np.zeros((training_size,num_features))
@@ -213,6 +217,8 @@ def MA_train(grid,f_grid,model,sub_model):
     width = grid.shape[1]
 
     training_size = (~np.isnan(grid)).sum()
+    if(training_size == 0):
+        return(False)
     num_features = f_grid.shape[2] + 4
 
     X_train = np.zeros((training_size,num_features))
@@ -272,6 +278,8 @@ def ARMA_train(grid,f_grid,model,sub_model):
     width = grid.shape[1]
 
     training_size = (~np.isnan(grid)).sum()
+    if(training_size == 0):
+        return(False)
     num_features = f_grid.shape[2] + 8
 
     X_train = np.zeros((training_size,num_features))

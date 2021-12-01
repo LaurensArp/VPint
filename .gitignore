@@ -28,3 +28,6 @@ build/
 
 # Autosklearn output
 autosklearn/
+
+# Baseline code
+baselines/

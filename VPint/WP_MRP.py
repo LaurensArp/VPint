@@ -209,11 +209,57 @@ class WP_SMRP(SMRP):
             f1_temp = f1.copy()
             f1_temp[f1_temp == 0] = 0.01
             gamma = np.mean(f2 / f1_temp) 
+        elif(method == "exact_inverse"):
+            f2_temp = f2.copy()
+            f2_temp[f2_temp == 0] = 0.01
+            gamma = np.mean(f1 / f2_temp) 
         else:
             print("Invalid method")
             intentionalcrash # TODO: start throwing proper exceptions...
         gamma = max(self.min_gamma,min(gamma,self.max_gamma))
         return(gamma)
+    
+    
+    def get_weights(self,i,j,method="predict"):
+        weights = {}
+        
+        # Up
+        if(i > 0):
+            f2 = self.feature_grid[i,j,:]
+            f1 = self.feature_grid[i-1,j,:]
+            gamma = self.predict_weight(f1,f2,method)
+            weights['up'] = gamma
+        else:
+            weights['up'] = np.nan
+        
+        # Right
+        if(j < self.feature_grid.shape[1]-1):
+            f2 = self.feature_grid[i,j,:]
+            f1 = self.feature_grid[i,j+1,:]
+            gamma = self.predict_weight(f1,f2,method)
+            weights['right'] = gamma
+        else:
+            weights['right'] = np.nan
+            
+        # Down
+        if(i < self.feature_grid.shape[0]-1):
+            f2 = self.feature_grid[i,j,:]
+            f1 = self.feature_grid[i+1,j,:]
+            gamma = self.predict_weight(f1,f2,method)
+            weights['down'] = gamma
+        else:
+            weights['down'] = np.nan   
+        
+        # Left
+        if(j > 0):
+            f2 = self.feature_grid[i,j,:]
+            f1 = self.feature_grid[i,j-1,:]
+            gamma = self.predict_weight(f1,f2,method)
+            weights['left'] = gamma
+        else:
+            weights['left'] = np.nan
+       
+        return(weights)
         
         
     def train(self,training_set=None,training_features=None,limit_training=True):
@@ -257,6 +303,8 @@ class WP_SMRP(SMRP):
                             c += 1
         
         training_size = c
+        if(training_size == 0):
+            return(False) # Allow for downstream handling of empty training sets
         num_features = training_features.shape[2] * 2
         
         X_train = np.zeros((training_size,num_features))
