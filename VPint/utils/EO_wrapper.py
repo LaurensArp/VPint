@@ -8,15 +8,15 @@ from VPint.WP_MRP import WP_SMRP
 def tiff_to_numpy(path):
     """Load GeoTIFF image as numpy array"""
     with rasterio.open(path) as fp:
-        vals = np.moveaxis(fp.read().astype(np.float64),0,-1)
+        vals = np.nan_to_num(np.moveaxis(fp.read().astype(np.float64),0,-1))
     return(vals)
 
-def multiband_VPint(target_img,feature_img,iterations=100,method='exact',max_gamma=np.inf,min_gamma=0):
+def multiband_VPint(target_img,feature_img,iterations=-1,method='exact',max_gamma=np.inf,min_gamma=0, prioritise_identity=True,priority_intensity=1):
     """Function to run VPint (WP-MRP) on all bands independently"""
     pred_img = target_img.copy()
     for b in range(target_img.shape[2]):
         MRP = WP_SMRP(target_img[:,:,b],feature_img[:,:,b],max_gamma=max_gamma,min_gamma=min_gamma)
-        pred_img[:,:,b] = MRP.run(iterations,method=method)
+        pred_img[:,:,b] = MRP.run(iterations=iterations,method=method)
     return(pred_img)
 
 def apply_cloud_mask(target_img,mask,threshold=None):
