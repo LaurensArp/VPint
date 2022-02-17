@@ -18,10 +18,10 @@ class WP_SMRP(SMRP):
         the original grid supplied to be interpolated
     pred_grid : 2D numpy array
         interpolated version of original_grid
-    feature_grid : 3D numpy array
+    feature_grid : 2D or 3D numpy array
         grid corresponding to original_grid, with feature vectors on the z-axis
     model : sklearn-based prediction model
-        user-supplied machine learning model used to predict weights
+        optional user-supplied machine learning model used to predict weights
 
     Methods
     -------
@@ -35,8 +35,8 @@ class WP_SMRP(SMRP):
         compute an indication of uncertainty per pixel in pred_grid
     """    
     
-    def __init__(self,grid,feature_grid,model=None,init_strategy='mean',max_gamma=np.inf,min_gamma=0):       
-        super().__init__(grid,init_strategy=init_strategy)
+    def __init__(self,grid,feature_grid,model=None,init_strategy='mean',max_gamma=np.inf,min_gamma=0,mask=None):       
+        super().__init__(grid,init_strategy=init_strategy,mask=mask)
         if(len(feature_grid.shape) == 3):
             self.feature_grid = feature_grid.copy().astype(float)
         elif(len(feature_grid.shape) == 2):
@@ -61,6 +61,13 @@ class WP_SMRP(SMRP):
         :param auto_terminate: if True, automatically terminate once the mean change in values after calling the update rule converges to a value under the auto_termination_threshold. Capped at 10000 iterations by default, though it usually takes under 100 iterations to converge
         :param auto_terminate_threshold: threshold for the amount of change as a proportion of the mean value of the grid, after which the algorithm automatically terminates
         :param track_delta: if True, return a vector containing the evolution of delta (mean proportion of change per iteration) along with the interpolated grid
+        :param confidence: return highly experimental confidence grid with predictions
+        :param confidence_model: model used to create confidence grid
+        :param save_gif: experimental code to save gif (not currently working)
+        :param gif_path: file to save convergence gif to
+        :param prioritise_identity: if True, predictions made using weights close to 1 will be weighted more heavily in the prediction dot product. For example, if a cell has 4 neighbours, 1 of which has a spatial weight of 1, and the others spatial weights of 0.1, 123 and 0.005, the predicted value will be largely based on the prediction resulting from the spatial weight of 1. If False, the predicted value will simply be the mean prediction of all four neighbours. Weights up to 1 are copied directly, and weights>1 are copied as 1/weight. This effect can be amplified by the priority_intensity parameter.
+        :param priority_intensity: intensity of the identity prioritisation function
+        :param known_value_bias: if prioritise_identity==True, also give higher weight to predictions derived from cells (close to) known values. Determined using SD-MRP.
         :returns: interpolated grid pred_grid
         """
         
@@ -135,8 +142,11 @@ class WP_SMRP(SMRP):
             # linked to human intuition. Also prioritise known values.
             
             priority_grid = weight_grid.copy()
-            priority_grid[priority_grid>1] = 1/priority_grid[priority_grid>1] / priority_intensity
-            priority_grid[priority_grid<1] = priority_grid[priority_grid<1] / priority_intensity
+            # w * (w/(w*i))
+            priority_grid[priority_grid>1] = 1/priority_grid[priority_grid>1] * (1/priority_grid[priority_grid>1] / (1/priority_grid[priority_grid>1] * priority_intensity))
+            #priority_grid[priority_grid>1] = 1/priority_grid[priority_grid>1] * priority_intensity
+            priority_grid[priority_grid<1] = priority_grid[priority_grid<1] * (priority_grid[priority_grid<1] / ((priority_grid[priority_grid<1]+0.001) * priority_intensity))
+            #priority_grid[priority_grid<1] = priority_grid[priority_grid<1] * priority_intensity
             
             priority_grid2 = np.zeros(priority_grid.shape)
             for d in range(0,priority_grid.shape[2]):
@@ -261,7 +271,13 @@ class WP_SMRP(SMRP):
         return(gamma)
     
     def get_weight_grid(self,method='predict',direction='up'):
-               
+        """
+        Simple function that can be used to visualise weights. Return a grid where every cell corresponds to the weight it receives from the cell in a given direction.
+        
+        :param method: prediction method, as used in run()
+        :param direction: direction from which the weights are visualised
+        :returns: weight grid
+        """
         # Setup all this once
         
         height = self.pred_grid.shape[0]

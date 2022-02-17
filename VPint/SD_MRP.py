@@ -34,8 +34,8 @@ class SD_SMRP(SMRP):
         compute an indication of uncertainty per pixel in pred_grid
     """
     
-    def __init__(self,grid,gamma=0.9,init_strategy='mean'):
-        super().__init__(grid,init_strategy=init_strategy)
+    def __init__(self,grid,gamma=0.9,init_strategy='mean',mask=None):
+        super().__init__(grid,init_strategy=init_strategy,mask=mask)
         self.gamma = gamma
     
     

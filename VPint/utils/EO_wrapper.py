@@ -8,7 +8,8 @@ from VPint.WP_MRP import WP_SMRP
 def tiff_to_numpy(path):
     """Load GeoTIFF image as numpy array"""
     with rasterio.open(path) as fp:
-        vals = np.nan_to_num(np.moveaxis(fp.read().astype(np.float64),0,-1))
+        vals = np.moveaxis(fp.read().astype(np.float64),0,-1)
+        vals = np.nan_to_num(vals,nan=np.nanmean(vals))
     return(vals)
 
 def multiband_VPint(target_img,feature_img,iterations=-1,method='exact',max_gamma=np.inf,min_gamma=0, prioritise_identity=True,priority_intensity=1):

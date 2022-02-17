@@ -29,7 +29,9 @@ class MRP:
         Computes the mean absolute error of pred_grid compared to a given ground truth grid
     """
     
-    def __init__(self,grid,init_strategy='mean'):
+    def __init__(self,grid,init_strategy='mean',mask=None):
+        if(mask is not None):
+            grid = self.apply_mask(grid,mask)
         self.original_grid = grid.copy()
         self.dims = len(grid.shape)
         self.init_pred_grid(init_strategy=init_strategy)
@@ -100,6 +102,18 @@ class MRP:
         """Return pred_grid"""
         self.update_grid()
         return(self.pred_grid)
+        
+    def apply_mask(self,grid,mask):
+        """Apply a supplied binary mask of missing values (1 denotes
+        missing values) to the input grid"""
+        shp = grid.shape
+        grid_vec = grid.reshape(np.product(grid.shape))
+        mask_vec = grid.reshape(np.product(mask.shape))
+        if(grid.shape != mask.shape):
+            print("Mismatching shapes") # should start throwing errors
+        grid_vec[mask_vec==1] = np.nan
+        grid = grid_vec.reshape(shp)
+        return(grid)
            
     
     def r_squared(self,true_grid):
@@ -109,6 +123,11 @@ class MRP:
         :param true_grid: ground truth for all grid cells
         :returns: r^2
         """
+        
+        # In case true grid contains nans
+        true_grid_mean = np.nanmean(true_grid)
+        true_grid = np.nan_to_num(true_grid,nan=true_grid_mean)
+        
         height = self.pred_grid.shape[0]
         width = self.pred_grid.shape[1]
         if(self.dims == 3):
@@ -144,6 +163,10 @@ class MRP:
         return(r_squared)
     
     def MAE(self,true):
+        # In case true grid contains nans
+        true_mean = np.nanmean(true)
+        true = np.nan_to_num(true,nan=true_mean)
+    
         pred = self.pred_grid.copy()
         mask = self.original_grid.copy()
         
@@ -157,6 +180,10 @@ class MRP:
     
     
     def RMSE(self,true):
+        # In case true grid contains nans
+        true_mean = np.nanmean(true)
+        true = np.nan_to_num(true,nan=true_mean)
+        
         pred = self.pred_grid.copy()
         mask = self.original_grid.copy()
         
@@ -170,6 +197,10 @@ class MRP:
         
 
     def PSNR(self,true):
+        # In case true grid contains nans
+        true_mean = np.nanmean(true)
+        true = np.nan_to_num(true,nan=true_mean)
+        
         # Based on https://www.geeksforgeeks.org/python-peak-signal-to-noise-ratio-psnr/
         pred = self.pred_grid.copy()
         mask = self.original_grid.copy()
@@ -187,6 +218,10 @@ class MRP:
         return(psnr)
 
     def SSIM(self,true):
+        # In case true grid contains nans
+        true_mean = np.nanmean(true)
+        true = np.nan_to_num(true,nan=true_mean)
+        
         pred = self.pred_grid.copy()
         mask = self.original_grid.copy()
 
@@ -226,8 +261,8 @@ class SMRP(MRP):
         Returns pred_grid
     """
     
-    def __init__(self,grid,init_strategy='mean'):
-        super().__init__(grid,init_strategy=init_strategy)
+    def __init__(self,grid,init_strategy='mean',mask=None):
+        super().__init__(grid,init_strategy=init_strategy,mask=mask)
 
     
     def mean_absolute_error(self,true_grid,scale_factor=1,gridded=False):
