@@ -1,9 +1,9 @@
-#VPInt
+# VPInt
 This repository contains the code required to run VPint (value propagation-based spatial interpolation). Although working code is available for spatio-temporal interpolation, we recommend spatial interpolation as its preferred use case. The spatio-temporal code is at this point outdated, and its support may get dropped entirely in the future.
 
 There are currently two versions of VPint, both of which are governed by update rules inspired by Markov reward processes. In the ideal case WP-MRP is used, which requires a target image (with NaNs denoting missing values, or with a mask of missing values) and a feature image containing values of the same area adhering to a similar spatial structure. If no feature data is available, SD-MRP can be used, though this will tend to regress to initialisation values over distance.
 
-##Installation
+## Installation
 To install VPint, please download the repository, navigate to the root folder, 
 and run
 `python setup.py install`
@@ -15,7 +15,7 @@ Dependencies:
 Optional depdendencies:
 * Scikit-image      0.17.2 (used for computing the SSIM performance metric)
 
-##Running VPint
+## Running VPint
 A minimal example to run VPint (WP-MRP), assuming appropriate data is already loaded:
 ```
 from VPint.WP_MRP import WP_SMRP
@@ -54,7 +54,7 @@ result_data = MRP.run()
 ```
 
 
-##Citing this work
+## Citing this work
 
 To view the initial Master thesis associated with this code, please
 see: https://ada.liacs.nl/papers/ArpEtAl20b.pdf 
