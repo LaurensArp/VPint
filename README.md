@@ -53,6 +53,19 @@ MRP = WP_SMRP(target_data,feature_data)
 result_data = MRP.run()
 ```
 
+To run WP-MRP with a machine learning model instead (useful in cases where the correlation between features and targets are less intense, but they are still related):
+
+```
+from VPint.WP_MRP import WP_SMRP
+from sklearn.linear_model import LinearRegression
+
+# Use any sklearn model (or other objects with train() and run() functions)
+model = LinearRegression() 
+MRP = WP_SMRP(target_data,feature_data,model=model)
+MRP.train() # Train ML model on available data
+result_data = MRP.run(method='predict')
+```
+
 
 ## Citing this work
 
