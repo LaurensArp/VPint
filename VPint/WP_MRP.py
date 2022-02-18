@@ -3,9 +3,11 @@
 
 import numpy as np
 
-from .MRP import SMRP, STMRP
+from .MRP import SMRP, STMRP, VPintError
 from .SD_MRP import SD_SMRP, SD_STMRP
 from .utils.hide_spatial_data import hide_values_uniform
+
+import time # TODO: remove after debugging
         
         
 class WP_SMRP(SMRP):
@@ -35,7 +37,9 @@ class WP_SMRP(SMRP):
         compute an indication of uncertainty per pixel in pred_grid
     """    
     
-    def __init__(self,grid,feature_grid,model=None,init_strategy='mean',max_gamma=np.inf,min_gamma=0,mask=None):       
+    def __init__(self,grid,feature_grid,model=None,init_strategy='mean',max_gamma=np.inf,min_gamma=0,mask=None):
+        if(grid.shape != feature_grid.shape and not(len(feature_grid.shape)==3 and feature_grid.shape[2]==1)):
+            raise VPintError("Target and feature grids have different shapes: " + str(grid.shape) + " and " + str(feature_grid.shape))
         super().__init__(grid,init_strategy=init_strategy,mask=mask)
         if(len(feature_grid.shape) == 3):
             self.feature_grid = feature_grid.copy().astype(float)
@@ -44,7 +48,7 @@ class WP_SMRP(SMRP):
                                                                           feature_grid.shape[1],
                                                                           1))
         else:
-            print("WARNING: Improper feature dimensions; expected 2 or 3, got " + str(len(feature_grid.shape)))
+            raise VPintError("Improper feature dimensions; expected 2 or 3, got " + str(len(feature_grid.shape)))
         self.model = model 
         self.max_gamma = max_gamma
         self.min_gamma = min_gamma
@@ -52,7 +56,7 @@ class WP_SMRP(SMRP):
         self._run_method = "predict"
     
             
-    def run(self,iterations=-1,method='predict',auto_terminate=True,auto_terminate_threshold=1e-4,track_delta=False, confidence=False,confidence_model=None,save_gif=False,gif_path="convergence.gif",prioritise_identity=False,priority_intensity=1,known_value_bias=1):
+    def run(self,iterations=-1,method='exact',auto_terminate=True,auto_terminate_threshold=1e-4,track_delta=False, confidence=False,confidence_model=None,save_gif=False,gif_path="convergence.gif",prioritise_identity=False,priority_intensity='auto',auto_priority_epochs=20,auto_priority_proportion=0.5,auto_priority_strategy='grid',auto_priority_max=10,auto_priority_min=1,auto_priority_max_iter=-1,known_value_bias=0):
         """
         Runs WP-SMRP for the specified number of iterations. Creates a 3D (h,w,4) tensor val_grid, where the z-axis corresponds to a neighbour of each cell, and a 3D (h,w,4) weight tensor weight_grid, where the z-axis corresponds to the weights of every neighbour in val_grid's z-axis. The x and y axes of both tensors are stacked into 2D (h*w,4) matrices (one of which is transposed), after which the dot product is taken between both matrices, resulting in a (h*w,h*w) matrix. As we are only interested in multiplying the same row numbers with the same column numbers, we take the diagonal entries of the computed matrix to obtain a 1D (h*w) vector of updated values (we use numpy's einsum to do this efficiently, without wasting computation on extra dot products). This vector is then divided element-wise by a vector (flattened 2D grid) counting the number of neighbours of each cell, and we use the object's original_grid to replace wrongly updated known values to their original true values. We finally reshape this vector back to the original 2D pred_grid shape of (h,w).
         
@@ -66,20 +70,17 @@ class WP_SMRP(SMRP):
         :param save_gif: experimental code to save gif (not currently working)
         :param gif_path: file to save convergence gif to
         :param prioritise_identity: if True, predictions made using weights close to 1 will be weighted more heavily in the prediction dot product. For example, if a cell has 4 neighbours, 1 of which has a spatial weight of 1, and the others spatial weights of 0.1, 123 and 0.005, the predicted value will be largely based on the prediction resulting from the spatial weight of 1. If False, the predicted value will simply be the mean prediction of all four neighbours. Weights up to 1 are copied directly, and weights>1 are copied as 1/weight. This effect can be amplified by the priority_intensity parameter.
-        :param priority_intensity: intensity of the identity prioritisation function
+        :param priority_intensity: intensity of the identity prioritisation function. Set to 'auto' to automatically set this value using grid search on a subsampled proportion of the grid.
+        :param auto_intensity_epochs: number of epochs for the random search if priority_intensity=='auto'
+        :param auto_intensity_proportion: proportion of cells to subsample for the random search if priority_intensity=='auto'
         :param known_value_bias: if prioritise_identity==True, also give higher weight to predictions derived from cells (close to) known values. Determined using SD-MRP.
         :returns: interpolated grid pred_grid
-        """
+        """      
         
         if(iterations > -1):
             auto_terminate = False
         else:
-            iterations = 1000
-            
-        if(save_gif):
-            from PIL import Image
-            gif = np.zeros((iterations,self.pred_grid.shape[0],self.pred_grid.shape[1]))
-            gif[0,:,:] = self.pred_grid.copy()
+            iterations = 5000
                
         # Setup all this once
         
@@ -95,76 +96,112 @@ class WP_SMRP(SMRP):
         
         # Compute weight grid once (vectorise at some point if possible)
         
-        
-        for i in range(0,height):
-            for j in range(0,width):
-                vec = np.zeros(4)
-                f2 = self.feature_grid[i,j,:]
-                if(i > 0):
-                    # Top
-                    f1 = self.feature_grid[i-1,j,:]
-                    vec[0] = self.predict_weight(f1,f2,method)
-                if(j < w):
-                    # Right
-                    f1 = self.feature_grid[i,j+1,:]
-                    vec[1] = self.predict_weight(f1,f2,method)
-                if(i < h):
-                    # Bottom
-                    f1 = self.feature_grid[i+1,j,:]
-                    vec[2] = self.predict_weight(f1,f2,method)
-                if(j > 0):
-                    # Left
-                    f1 = self.feature_grid[i,j-1,:]
-                    vec[3] = self.predict_weight(f1,f2,method)
+        # Ideally this if wouldn't be hardcodedhere , ML would also be vectorised, and predict_weight
+        # would take entire grids as input
+        if(method=='exact'):
+            feature_size = self.feature_grid.shape[2]
 
-                weight_grid[i,j,:] = vec
+            shp = self.feature_grid.shape
+            size = np.product(shp)
+            f_grid = self.feature_grid.reshape(size)
+            f_grid[f_grid==0] = 0.01
+            f_grid = f_grid.reshape(shp)
+
+            # Every matrix contains feature vectors for the neighbour in some direction
+
+            up_grid = np.ones((height,width,feature_size))
+            right_grid = np.ones((height,width,feature_size))
+            down_grid = np.ones((height,width,feature_size))
+            left_grid = np.ones((height,width,feature_size))
+
+            up_grid[1:-1,:,:] = f_grid[0:-2,:,:]
+            right_grid[:,0:-2,:] = f_grid[:,1:-1,:]
+            down_grid[0:-2,:,:] = f_grid[1:-1,:,:]
+            left_grid[:,1:-1,:] = f_grid[:,0:-2,:]
+
+            # Compute weights exacly
+
+            up_weights = np.mean(f_grid / up_grid, axis=2)
+            up_weights[0,:] = 0
+            right_weights = np.mean(f_grid / right_grid, axis=2)
+            right_weights[:,-1] = 0
+            down_weights = np.mean(f_grid / down_grid, axis=2)
+            down_weights[-1,:] = 0
+            left_weights = np.mean(f_grid / left_grid, axis=2)
+            left_weights[:,0] = 0
+
+            weight_grid = np.stack([up_weights,right_weights,down_weights,left_weights],axis=-1)
+            
+            
+        else:
+            for i in range(0,height):
+                for j in range(0,width):
+                    vec = np.zeros(4)
+                    f2 = self.feature_grid[i,j,:]
+                    if(i > 0):
+                        # Top
+                        f1 = self.feature_grid[i-1,j,:]
+                        vec[0] = self.predict_weight(f1,f2,method)
+                    if(j < w):
+                        # Right
+                        f1 = self.feature_grid[i,j+1,:]
+                        vec[1] = self.predict_weight(f1,f2,method)
+                    if(i < h):
+                        # Bottom
+                        f1 = self.feature_grid[i+1,j,:]
+                        vec[2] = self.predict_weight(f1,f2,method)
+                    if(j > 0):
+                        # Left
+                        f1 = self.feature_grid[i,j-1,:]
+                        vec[3] = self.predict_weight(f1,f2,method)
+
+                    weight_grid[i,j,:] = vec
         
         weight_matrix = weight_grid.reshape((height*width,4)).transpose()
         
-        # Set neighbour count and weight grids
+        # Set neighbour count grid
         
-        for i in range(0,height):
-            for j in range(0,width):
-                nc = 4
-                if(i <= 0):
-                    nc -= 1
-                if(i >= height-1):
-                    nc -= 1
-                if(j <= 0):
-                    nc -= 1
-                if(j >= width-1):
-                    nc -= 1
-                neighbour_count_grid[i,j] = nc
+        neighbour_count_grid = np.ones(self.pred_grid.shape) * 4
+
+        neighbour_count_grid[:,0] = neighbour_count_grid[:,0] - np.ones(neighbour_count_grid.shape[1])
+        neighbour_count_grid[:,width-1] = neighbour_count_grid[:,width-1] - np.ones(neighbour_count_grid.shape[1])
+
+        neighbour_count_grid[0,:] = neighbour_count_grid[0,:] - np.ones(neighbour_count_grid.shape[0])
+        neighbour_count_grid[height-1,:] = neighbour_count_grid[height-1,:] - np.ones(neighbour_count_grid.shape[0])
+        
+        neighbour_count_vec = neighbour_count_grid.reshape(width*height)
                 
         if(prioritise_identity):
             # Prioritise weights close to 1, under the assumption they will be
-            # more informative/constant. Continuity bias or something, can be
-            # linked to human intuition. Also prioritise known values.
+            # more informative/constant. 
+            
+            if(priority_intensity=='auto'):
+                priority_intensity = self.find_identity_param(auto_priority_epochs,auto_priority_proportion,
+                                                              search_strategy=auto_priority_strategy, 
+                                                              min_val=auto_priority_min,max_val=auto_priority_max,
+                                                              max_sub_iter=auto_priority_max_iter)
             
             priority_grid = weight_grid.copy()
-            # w * (w/(w*i))
             priority_grid[priority_grid>1] = 1/priority_grid[priority_grid>1] * (1/priority_grid[priority_grid>1] / (1/priority_grid[priority_grid>1] * priority_intensity))
-            #priority_grid[priority_grid>1] = 1/priority_grid[priority_grid>1] * priority_intensity
             priority_grid[priority_grid<1] = priority_grid[priority_grid<1] * (priority_grid[priority_grid<1] / ((priority_grid[priority_grid<1]+0.001) * priority_intensity))
-            #priority_grid[priority_grid<1] = priority_grid[priority_grid<1] * priority_intensity
             
-            priority_grid2 = np.zeros(priority_grid.shape)
-            for d in range(0,priority_grid.shape[2]):
-                priority_grid2[:,:,d] = self.original_grid.copy()
-            priority_grid2[~np.isnan(priority_grid2)] = 1
-            priority_grid3 = priority_grid2.copy()
-            for d in range(0,priority_grid3.shape[2]):
-                sub_MRP = SD_SMRP(priority_grid2[:,:,d],init_strategy='zero',gamma=known_value_bias)
-                priority_grid3[:,:,d] = sub_MRP.run()
-            priority_grid = np.multiply(priority_grid,priority_grid3)
-            # Smooth for 0
-            priority_vec = priority_grid.reshape(np.product(priority_grid.shape))
-            priority_vec[priority_vec==0] = 0.01
-            priority_grid = priority_vec.reshape(priority_grid.shape)
-            
+            # Prioritise known values
+            if(known_value_bias>0):
+                priority_grid2 = np.zeros(priority_grid.shape)
+                for d in range(0,priority_grid.shape[2]):
+                    priority_grid2[:,:,d] = self.original_grid.copy()
+                priority_grid2[~np.isnan(priority_grid2)] = 1
+                priority_grid3 = priority_grid2.copy()
+                for d in range(0,priority_grid3.shape[2]):
+                    sub_MRP = SD_SMRP(priority_grid2[:,:,d],init_strategy='zero',gamma=(1-known_value_bias))
+                    priority_grid3[:,:,d] = sub_MRP.run()
+                priority_grid = np.multiply(priority_grid,priority_grid3)
+                # Smooth for 0
+                priority_vec = priority_grid.reshape(np.product(priority_grid.shape))
+                priority_vec[priority_vec==0] = 0.01
+                priority_grid = priority_vec.reshape(priority_grid.shape)
         
-        neighbour_count_vec = neighbour_count_grid.reshape(width*height)
-        
+        # Track amount of change over iterations
         if(track_delta):
             delta_vec = np.zeros(iterations)
         
@@ -220,15 +257,9 @@ class WP_SMRP(SMRP):
                         break
 
             self.pred_grid = new_grid
-            if(save_gif):
-                gif[it+1,:,:] = new_grid.copy()
             
         self.run_state = True
         self.run_method = method
-            
-        if(save_gif):
-            images = [Image.fromarray(step) for step in gif]
-            images[0].save(gif_path, save_all=True, append_images=images[1:], duration=(0x7fff * 2), loop=0)
                         
         if(track_delta):
             return(self.pred_grid,delta_vec)
@@ -265,10 +296,77 @@ class WP_SMRP(SMRP):
             f2_temp[f2_temp == 0] = 0.01
             gamma = np.mean(f1 / f2_temp) 
         else:
-            print("Invalid method")
-            intentionalcrash # TODO: start throwing proper exceptions...
+            raise VPintError("Invalid weight prediction method: " + str(method))
         gamma = max(self.min_gamma,min(gamma,self.max_gamma))
         return(gamma)
+    
+    def find_identity_param(self,search_epochs,subsample_proportion,search_strategy='grid',min_val=0,max_val=10,max_sub_iter=-1):
+        """
+        Automatically sets the identity priority intensity parameter to the best found value. Currently
+        only supports random search.
+        
+        :param search_epochs: number of epochs used by the random search
+        :param subsample_proportion: proportion of training data used to compute errors
+        :returns: best found value for identity priority intensity
+        """
+
+        # Subsample
+
+        sub_grid = self.original_grid.copy()
+        
+        shp = sub_grid.shape
+        size = np.product(shp)
+        
+        rand_vec = np.random.rand(size)
+        sub_vec = sub_grid.reshape(size)
+        
+        sub_vec[rand_vec<subsample_proportion] = np.nan
+        sub_grid = sub_vec.reshape(shp)
+
+        best_loss = np.inf
+        best_val = -1
+
+        if(search_strategy=='random'):
+            for ep in range(0,search_epochs):
+                # Random search for best val for search_epochs iterations
+
+                temp_MRP = WP_SMRP(sub_grid,self.feature_grid.copy())
+                val = np.random.randint(low=min_val,high=max_val)
+                pred_grid = temp_MRP.run(prioritise_identity=True,priority_intensity=val,iterations=max_sub_iter)
+
+                # Compute MAE of subsampled predictions
+                mae = np.nanmean(np.absolute(pred_grid.reshape(np.product(pred_grid.shape)) - self.original_grid.reshape(np.product(self.original_grid.shape))))
+
+                if(mae < best_loss):
+                    best_val = val
+                    best_loss = mae
+
+                temp_MRP.reset()
+                
+        elif(search_strategy=='grid'):
+            for val in range(min_val,max_val):
+                # Random search for best val for search_epochs iterations
+
+                temp_MRP = WP_SMRP(sub_grid,self.feature_grid.copy())
+                pred_grid = temp_MRP.run(prioritise_identity=True,priority_intensity=val,iterations=max_sub_iter)
+
+                # Compute MAE of subsampled predictions
+                mae = np.nanmean(np.absolute(pred_grid.reshape(np.product(pred_grid.shape)) - self.original_grid.reshape(np.product(self.original_grid.shape))))
+
+                if(mae < best_loss):
+                    best_val = val
+                    best_loss = mae
+
+                temp_MRP.reset()
+                
+        else:
+            raise VPintError("Invalid search strategy: " + str(search_strategy))
+                
+        if(best_val==-1):
+            print("WARNING: no identity priority intensity better than dummy, please check your code")
+            
+        return(best_val)
+    
     
     def get_weight_grid(self,method='predict',direction='up'):
         """
@@ -324,7 +422,7 @@ class WP_SMRP(SMRP):
         elif(direction=='left'):
             return(weight_grid[:,:,3])
         else:
-            print("Invalid direction")
+            raise VPintError("Invalid direction: " + str(direction))
     
     def get_weights(self,i,j,method="predict"):
         weights = {}

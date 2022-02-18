@@ -45,8 +45,38 @@ class MRP:
         """Return prediction grid and graph representation to their original form"""
         self.pred_grid = self.original_grid
           
+            
+    def init_pred_grid(self,init_strategy='mean'):
+        """Initialise pred_grid with mean/random/zero values as initial values for missing cells
+        
+        :param init_strategy: method for initialising unknown values. Options: 'zero', 'random', 'mean'"""
+        
+        pred_grid = self.original_grid.copy()
+        shp = pred_grid.shape
+        size = np.product(pred_grid.shape)
+        
+        if(init_strategy=='mean'):
+            mean = np.nanmean(pred_grid)
+            pred_vec = pred_grid.reshape(size)
+            pred_vec[np.isnan(pred_vec)] = mean
+            pred_grid = pred_vec.reshape(shp)
+        elif(init_strategy=='zero'):
+            pred_vec = pred_grid.reshape(size)
+            pred_vec[np.isnan(pred_vec)] = 0
+            pred_grid = pred_vec.reshape(shp)
+        elif(init_strategy=='random'):
+            pred_vec = pred_grid.reshape(size)
+            num_nan = len(pred_vec[np.isnan(pred_vec)])
+            random_vec = np.random.normal(np.nanmean(pred_vec),np.nanstd(pred_vec),size=num_nan)
+            pred_vec[np.isnan(pred_vec)] = random_vec
+            pred_grid = pred_vec.reshape(shp)
+        else:
+            raise VPintError("Invalid initialisation strategy: " + str(init_strategy))
+            
+        self.pred_grid = pred_grid
+                    
     
-    def init_pred_grid(self,init_strategy='zero'):
+    def init_pred_grid_old(self,init_strategy='zero'):
         """Initialise pred_grid with mean values as initial values for missing cells
         
         :param init_strategy: method for initialising unknown values. Options: 'zero', 'random', 'mean'"""
@@ -110,7 +140,7 @@ class MRP:
         grid_vec = grid.reshape(np.product(grid.shape))
         mask_vec = grid.reshape(np.product(mask.shape))
         if(grid.shape != mask.shape):
-            print("Mismatching shapes") # should start throwing errors
+            raise VPintError("Target and mask grids have different shapes: " + str(grid.shape) + " and " + str(mask.shape))
         grid_vec[mask_vec==1] = np.nan
         grid = grid_vec.reshape(shp)
         return(grid)
@@ -253,9 +283,6 @@ class SMRP(MRP):
     -------
     reset():
         Returns pred_grid and G to their original state
-        
-    update_grid():
-        Updates pred_grid to reflect changes to G
         
     get_pred_grid():
         Returns pred_grid
@@ -475,3 +502,6 @@ class STMRP(MRP):
             result = mae
             
         return(result)
+    
+class VPintError(Exception):
+    pass

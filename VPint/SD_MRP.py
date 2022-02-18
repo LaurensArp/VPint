@@ -74,33 +74,29 @@ class SD_SMRP(SMRP):
         w = width - 1
         
         neighbour_count_grid = np.zeros((height,width))
-        weight_grid = np.zeros((height,width,4))
+        #weight_grid = np.zeros((height,width,4))
         global_weight_vec = np.ones(4) * self.gamma
         val_grid = np.zeros((height,width,4))
         
         # Compute weight grid once (vectorise at some point if possible)
         
-        for i in range(0,height):
-            for j in range(0,width):
-                vec = np.ones(4) * self.gamma
-                weight_grid[i,j,:] = vec
+        #for i in range(0,height):
+        #    for j in range(0,width):
+        #        vec = np.ones(4) * self.gamma
+        #        weight_grid[i,j,:] = vec
+        weight_grid = np.ones((height,width,4)) * self.gamma
         
         weight_matrix = weight_grid.reshape((height*width,4)).transpose()
         
-        # Set neighbour count and weight grids
+        # Set neighbour count grid
         
-        for i in range(0,height):
-            for j in range(0,width):
-                nc = 4
-                if(i <= 0):
-                    nc -= 1
-                if(i >= height-1):
-                    nc -= 1
-                if(j <= 0):
-                    nc -= 1
-                if(j >= width-1):
-                    nc -= 1
-                neighbour_count_grid[i,j] = nc
+        neighbour_count_grid = np.ones(self.pred_grid.shape) * 4
+
+        neighbour_count_grid[:,0] = neighbour_count_grid[:,0] - np.ones(neighbour_count_grid.shape[1])
+        neighbour_count_grid[:,width-1] = neighbour_count_grid[:,width-1] - np.ones(neighbour_count_grid.shape[1])
+
+        neighbour_count_grid[0,:] = neighbour_count_grid[0,:] - np.ones(neighbour_count_grid.shape[0])
+        neighbour_count_grid[height-1,:] = neighbour_count_grid[height-1,:] - np.ones(neighbour_count_grid.shape[0])
         
         neighbour_count_vec = neighbour_count_grid.reshape(width*height)
         
