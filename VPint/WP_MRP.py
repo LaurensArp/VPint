@@ -38,8 +38,15 @@ class WP_SMRP(SMRP):
     """    
     
     def __init__(self,grid,feature_grid,model=None,init_strategy='mean',max_gamma=np.inf,min_gamma=0,mask=None):
-        if(grid.shape != feature_grid.shape and not(len(feature_grid.shape)==3 and feature_grid.shape[2]==1)):
+        # Check shapes
+        if(grid.shape[0] != feature_grid.shape[0] or grid.shape[1] != feature_grid.shape[1]):
             raise VPintError("Target and feature grids have different shapes: " + str(grid.shape) + " and " + str(feature_grid.shape))
+        if(len(grid.shape)>2):
+            # Reshape [None,None,1] to [None,None]
+            if(grid.shape[2]==1):
+                grid = grid[:,:,0]
+            else:
+                raise VPintError("Input grid needs to be two-dimensional, got " + str(grid.shape))
         super().__init__(grid,init_strategy=init_strategy,mask=mask)
         if(len(feature_grid.shape) == 3):
             self.feature_grid = feature_grid.copy().astype(float)
@@ -56,7 +63,7 @@ class WP_SMRP(SMRP):
         self._run_method = "predict"
     
             
-    def run(self,iterations=-1,method='exact',auto_terminate=True,auto_terminate_threshold=1e-4,track_delta=False, confidence=False,confidence_model=None,save_gif=False,gif_path="convergence.gif",prioritise_identity=False,priority_intensity='auto',auto_priority_epochs=20,auto_priority_proportion=0.5,auto_priority_strategy='grid',auto_priority_max=10,auto_priority_min=1,auto_priority_max_iter=-1,known_value_bias=0):
+    def run(self,iterations=-1,method='exact',auto_terminate=True,auto_terminate_threshold=1e-4,track_delta=False, confidence=False,confidence_model=None,save_gif=False,gif_path="convergence.gif",prioritise_identity=False,priority_intensity='auto',auto_priority_epochs=20,auto_priority_proportion=0.5,auto_priority_strategy='grid',auto_priority_max=10,auto_priority_min=1,auto_priority_max_iter=-1,auto_priority_verbose=False,known_value_bias=0):
         """
         Runs WP-SMRP for the specified number of iterations. Creates a 3D (h,w,4) tensor val_grid, where the z-axis corresponds to a neighbour of each cell, and a 3D (h,w,4) weight tensor weight_grid, where the z-axis corresponds to the weights of every neighbour in val_grid's z-axis. The x and y axes of both tensors are stacked into 2D (h*w,4) matrices (one of which is transposed), after which the dot product is taken between both matrices, resulting in a (h*w,h*w) matrix. As we are only interested in multiplying the same row numbers with the same column numbers, we take the diagonal entries of the computed matrix to obtain a 1D (h*w) vector of updated values (we use numpy's einsum to do this efficiently, without wasting computation on extra dot products). This vector is then divided element-wise by a vector (flattened 2D grid) counting the number of neighbours of each cell, and we use the object's original_grid to replace wrongly updated known values to their original true values. We finally reshape this vector back to the original 2D pred_grid shape of (h,w).
         
@@ -180,6 +187,8 @@ class WP_SMRP(SMRP):
                                                               search_strategy=auto_priority_strategy, 
                                                               min_val=auto_priority_min,max_val=auto_priority_max,
                                                               max_sub_iter=auto_priority_max_iter)
+                if(auto_priority_verbose):
+                    print("Best found priority intensity: " + str(priority_intensity))
             
             priority_grid = weight_grid.copy()
             priority_grid[priority_grid>1] = 1/priority_grid[priority_grid>1] * (1/priority_grid[priority_grid>1] / (1/priority_grid[priority_grid>1] * priority_intensity))
