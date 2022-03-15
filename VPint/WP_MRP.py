@@ -183,7 +183,7 @@ class WP_SMRP(SMRP):
             # more informative/constant. 
             
             if(priority_intensity=='auto'):
-                priority_intensity = self.find_identity_param(auto_priority_epochs,auto_priority_proportion,
+                priority_intensity = self.find_beta(auto_priority_epochs,auto_priority_proportion,
                                                               search_strategy=auto_priority_strategy, 
                                                               min_val=auto_priority_min,max_val=auto_priority_max,
                                                               max_sub_iter=auto_priority_max_iter)
@@ -309,7 +309,7 @@ class WP_SMRP(SMRP):
         gamma = max(self.min_gamma,min(gamma,self.max_gamma))
         return(gamma)
     
-    def find_identity_param(self,search_epochs,subsample_proportion,search_strategy='grid',min_val=0,max_val=10,max_sub_iter=-1):
+    def find_beta(self,search_epochs,subsample_proportion,search_strategy='grid',subsample_strategy='max_diff',min_val=0,max_val=10,max_sub_iter=-1):
         """
         Automatically sets the identity priority intensity parameter to the best found value. Currently
         only supports random search.
@@ -320,21 +320,45 @@ class WP_SMRP(SMRP):
         """
 
         # Subsample
+        if(subsample_strategy=='random'):
+            sub_grid = self.original_grid.copy()
 
-        sub_grid = self.original_grid.copy()
-        
-        shp = sub_grid.shape
-        size = np.product(shp)
-        
-        rand_vec = np.random.rand(size)
-        sub_vec = sub_grid.reshape(size)
-        
-        sub_vec[rand_vec<subsample_proportion] = np.nan
-        sub_grid = sub_vec.reshape(shp)
+            shp = sub_grid.shape
+            size = np.product(shp)
 
+            rand_vec = np.random.rand(size)
+            sub_vec = sub_grid.reshape(size)
+
+            sub_vec[rand_vec<subsample_proportion] = np.nan
+            sub_grid = sub_vec.reshape(shp)
+
+
+        elif(subsample_strategy=='max_diff'):
+            sub_grid = self.original_grid.copy()
+            diff = np.absolute(self.original_grid - np.mean(self.feature_grid,axis=2))
+            
+            shp = sub_grid.shape
+            size = np.product(shp)
+
+            diff_vec = diff.reshape(size)
+            sub_vec = sub_grid.reshape(size)
+            
+            # Get indices of sorted array
+            num_pixels = int(subsample_proportion * len(diff_vec[~np.isnan(diff_vec)]))
+            diff = np.nan_to_num(diff,nan=0.0)
+            temp = np.argpartition(-diff_vec,num_pixels)
+            result_args = temp[:num_pixels]
+            
+            # Replace most different pixels by nan
+            sub_vec[result_args] = np.nan
+            sub_grid = sub_vec.reshape(shp)
+            
+        else:
+            raise VPintError("Invalid subsample strategy: " + str(subsample_strategy))
+            
         best_loss = np.inf
         best_val = -1
-
+        
         if(search_strategy=='random'):
             for ep in range(0,search_epochs):
                 # Random search for best val for search_epochs iterations
@@ -377,7 +401,7 @@ class WP_SMRP(SMRP):
         return(best_val)
     
     
-    def get_weight_grid(self,method='predict',direction='up'):
+    def get_weight_grid(self,method='exact',direction='up'):
         """
         Simple function that can be used to visualise weights. Return a grid where every cell corresponds to the weight it receives from the cell in a given direction.
         
