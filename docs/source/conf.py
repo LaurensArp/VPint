@@ -17,8 +17,8 @@ sys.path.insert(0, os.path.abspath('../../'))
 
 # -- Project information -----------------------------------------------------
 
-project = 'MRPinterpolation'
-copyright = '2021, Laurens Arp'
+project = 'VPint'
+copyright = '2022, Laurens Arp'
 author = 'Laurens Arp'
 
 

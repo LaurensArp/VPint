@@ -12,7 +12,7 @@ import time # TODO: remove after debugging
         
 class WP_SMRP(SMRP):
     """
-    Class for WP-SMRP, extending SMRP
+    Class for WP-SMRP, extending SMRP.
 
     Attributes
     ----------
@@ -29,6 +29,18 @@ class WP_SMRP(SMRP):
     -------
     run():
         Runs WP-MRP
+        
+    predict_weight():
+        Predict the weight between two cells based on their features
+        
+    find_beta():
+        Automatically determine the best value for beta
+    
+    get_weight_grid():
+        Returns a grid of weights in a particular direction (can be useful for visualisations and debugging)
+        
+    get_weights():
+        Returns the weights towards a particular cell based in its and its neighbours' features
         
     train():
         Train supplied prediction model on subsampled data or a training set
@@ -630,63 +642,7 @@ class WP_SMRP(SMRP):
         err_grid_full = sub_MRP.run(100)
         
         return(err_grid_full)
-        
-        
-    def visualise_weights(self,method="exact",aggregate=False):
-        grid = self.feature_grid.copy()
-
-        height = grid.shape[0]
-        width = grid.shape[1]
-
-        if(not(aggregate)):
-            weight_grid = np.zeros(((height*3),(width*3)))
-        else:
-            weight_grid = np.zeros((height,width))
-
-        for i in range(0,height):
-            for j in range(0,width):
-                if(not(aggregate)):
-                    i_off = i*3+1
-                    j_off = j*3+1
-                    weight_grid[i_off,j_off] = np.nan
-                    weight_grid[i_off-1,j_off-1] = np.nan
-                    weight_grid[i_off-1,j_off+1] = np.nan
-                    weight_grid[i_off+1,j_off-1] = np.nan
-                    weight_grid[i_off+1,j_off+1] = np.nan
-                else:
-                    i_off = i
-                    j_off = j
-
-                div_count = 0
-                up = np.nan
-                left = np.nan
-                right = np.nan
-                down = np.nan
-                if(i > 0):
-                    up = self.predict_weight(grid[i-1,j,:],grid[i,j,:],method)
-                    div_count += 1
-                if(i < height-1):
-                    down = self.predict_weight(grid[i+1,j,:],grid[i,j,:],method)
-                    div_count += 1
-                if(j > 0):
-                    left = self.predict_weight(grid[i,j-1,:],grid[i,j,:],method)
-                    div_count += 1
-                if(j < width-1):
-                    right = self.predict_weight(grid[i,j+1,:],grid[i,j,:],method)
-                    div_count += 1
-                    
-                
-                if(not(aggregate)):
-                    weight_grid[i_off-1,j_off] = up
-                    weight_grid[i_off+1,j_off] = down
-                    weight_grid[i_off,j_off-1] = left
-                    weight_grid[i_off,j_off+1] = right
-                else:
-                    val = np.nansum(np.array([up,down,left,right])) - 1 # 0 should be most similar
-                    weight_grid[i,j] = val / div_count
-
-        return(weight_grid)
-                        
+         
                
         
 class WP_STMRP(STMRP):

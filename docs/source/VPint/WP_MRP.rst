@@ -1,7 +1,7 @@
-SMRP
+WP_MRP
 ----
 
-.. automodule:: MRPinterpolation.SMRP
+.. automodule:: VPint.WP_MRP
     :members:
     :undoc-members:
     :show-inheritance:

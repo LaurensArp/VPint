@@ -1,7 +1,7 @@
-STMRP
+SD_MRP
 -----
 
-.. automodule:: MRPinterpolation.STMRP
+.. automodule:: VPint.SD_MRP
     :members:
     :undoc-members:
     :show-inheritance:

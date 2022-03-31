@@ -18,15 +18,30 @@ class MRP:
     _dims : the number of dimensions for this MRP (2 for spatial, 3 for temporal)
 
     Methods
-    -------
-    reset():
-        Returns pred_grid and G to their original state
-        
+    -------       
     get_pred_grid():
         Returns pred_grid
         
-    mean_absolute_error():
+    get_pred_grid():
+        Reset pred_grid
+        
+    init_pred_grid():
+        Initialises pred_grid given an input grid and an initialisation strategy
+        
+    r_squared():
+        Computes the r^2 of pred_grid compared to a given ground truth grid
+        
+    MAE():
         Computes the mean absolute error of pred_grid compared to a given ground truth grid
+        
+    RMSE():
+        Computes the root mean squared error of pred_grid compared to a given ground truth grid
+        
+    PSNR():
+        Computes the peak signal-to-noise ratio of pred_grid compared to a given ground truth grid
+        
+    SSIM():
+        Computes the structural similarity index of pred_grid compared to a given ground truth grid
     """
     
     def __init__(self,grid,init_strategy='mean',mask=None):
@@ -42,12 +57,12 @@ class MRP:
     
     
     def reset(self):
-        """Return prediction grid and graph representation to their original form"""
+        """Set pred_grid to its original state (original grid)"""
         self.pred_grid = self.original_grid
           
             
     def init_pred_grid(self,init_strategy='mean'):
-        """Initialise pred_grid with mean/random/zero values as initial values for missing cells
+        """Initialise pred_grid with mean/random/zero values as initial values for missing cells.
         
         :param init_strategy: method for initialising unknown values. Options: 'zero', 'random', 'mean'"""
         
@@ -74,68 +89,20 @@ class MRP:
             raise VPintError("Invalid initialisation strategy: " + str(init_strategy))
             
         self.pred_grid = pred_grid
-                    
-    
-    def init_pred_grid_old(self,init_strategy='zero'):
-        """Initialise pred_grid with mean values as initial values for missing cells
-        
-        :param init_strategy: method for initialising unknown values. Options: 'zero', 'random', 'mean'"""
-        
-        self.pred_grid = self.original_grid.copy()
-        height = self.pred_grid.shape[0]
-        if(self.dims > 1):
-            width = self.pred_grid.shape[1]
-        if(self.dims == 3):
-            depth = self.pred_grid.shape[2]
-
-        for i in range(0,height):
-            if(self.dims > 1):
-                for j in range(0,width):
-                    if(self.dims == 3):
-                        # Spatio-temporal case
-                        for t in range(0,depth):
-                            if(np.isnan(self.pred_grid[i,j,t])):
-                                initval = 0
-                                if(init_strategy == "random"):
-                                    mean = np.nanmean(self.original_grid)
-                                    std = np.nanstd(self.original_grid)
-                                    initval = np.random.normal(mean,std)
-                                elif(init_strategy == "mean"):
-                                    initval = np.nanmean(self.original_grid)
-                                self.pred_grid[i,j,t] = initval
-                    else:
-                        # Spatial case
-                        if(np.isnan(self.pred_grid[i,j])):
-                            initval = 0
-                            if(init_strategy == "random"):
-                                mean = np.nanmean(self.original_grid)
-                                std = np.nanstd(self.original_grid)
-                                initval = np.random.normal(mean,std)
-                            elif(init_strategy == "mean"):
-                                initval = np.nanmean(self.original_grid)
-                            self.pred_grid[i,j] = initval
-                        
-            else:
-                # Temporal case
-                if(np.isnan(self.pred_grid[i])):
-                    initval = 0
-                    if(init_strategy == "random"):
-                        mean = np.nanmean(self.original_grid)
-                        std = np.nanstd(self.original_grid)
-                        initval = np.random.normal(mean,std)
-                    elif(init_strategy == "mean"):
-                        initval = np.nanmean(self.original_grid)
-                    self.pred_grid[i] = initval
-             
                
     def get_pred_grid(self):
-        """Return pred_grid"""
+        """Return pred_grid
+        
+        :returns: pred_grid"""
         self.update_grid()
         return(self.pred_grid)
         
     def apply_mask(self,grid,mask):
-        """Apply a supplied binary mask of missing values (1 denotes
-        missing values) to the input grid"""
+        """Apply a supplied binary mask of missing values (1 denotes missing values) to the input grid.
+        
+        :param grid: the target grid to apply the mask to
+        :param mask: binary mask (0/1) of the same shape as grid, where 1 denotes missing values
+        :returns: target grid with missing values as specified by the mask"""
         shp = grid.shape
         grid_vec = grid.reshape(np.product(grid.shape))
         mask_vec = grid.reshape(np.product(mask.shape))
@@ -193,6 +160,12 @@ class MRP:
         return(r_squared)
     
     def MAE(self,true):
+        """
+        Compute the mean absolute error of pred_grid given true as ground truth.
+        
+        :param true: ground truth for all grid cells
+        :returns: mean absolute error
+        """
         # In case true grid contains nans
         true_mean = np.nanmean(true)
         true = np.nan_to_num(true,nan=true_mean)
@@ -210,6 +183,12 @@ class MRP:
     
     
     def RMSE(self,true):
+        """
+        Compute the root mean squared error of pred_grid given true as ground truth.
+        
+        :param true: ground truth for all grid cells
+        :returns: root mean squared error
+        """
         # In case true grid contains nans
         true_mean = np.nanmean(true)
         true = np.nan_to_num(true,nan=true_mean)
@@ -227,6 +206,12 @@ class MRP:
         
 
     def PSNR(self,true):
+        """
+        Compute the peak signal-to-noise ratio of pred_grid given true as ground truth.
+        
+        :param true: ground truth for all grid cells
+        :returns: peak signal-to-noise ratio
+        """
         # In case true grid contains nans
         true_mean = np.nanmean(true)
         true = np.nan_to_num(true,nan=true_mean)
@@ -248,6 +233,12 @@ class MRP:
         return(psnr)
 
     def SSIM(self,true):
+        """
+        Compute the structural similarity index of pred_grid given true as ground truth.
+        
+        :param true: ground truth for all grid cells
+        :returns: structural similarity index
+        """
         # In case true grid contains nans
         true_mean = np.nanmean(true)
         true = np.nan_to_num(true,nan=true_mean)
@@ -281,9 +272,7 @@ class SMRP(MRP):
 
     Methods
     -------
-    reset():
-        Returns pred_grid and G to their original state
-        
+       
     get_pred_grid():
         Returns pred_grid
     """
@@ -338,8 +327,7 @@ class SMRP(MRP):
             
 class STMRP(MRP):
     """
-    Basic class implementing the basic spatio-temporal framework for 
-    SD-MRP and WP-MRP.
+    Basic class implementing the basic spatio-temporal framework for SD-MRP and WP-MRP. Slightly outdated as not all development for the spatial VPint has been applied here yet.
 
     Attributes
     ----------
@@ -351,10 +339,7 @@ class STMRP(MRP):
         list containing the indices (temporal dimension) of pred_grid provided in the input data 
 
     Methods
-    -------
-    reset():
-        Returns pred_grid and G to their original state
-        
+    -------       
     dim_check():
         Checks the dimensions of supplied grid, transforms to
         3D grid if necessary
