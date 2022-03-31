@@ -383,9 +383,7 @@ class STMRP(MRP):
     
     def set_timesteps(self,data):
         """
-        Checks the dimensions of the supplied grid, and transforms
-        it into a 3D grid (at a single time step) if necessary (this
-        retains non-temporal spatial MRP functionality).
+        Checks the dimensions of the supplied grid, and transforms it into a 3D grid (at a single time step) if necessary (this retains non-temporal spatial MRP functionality).
         
         :param data: dictionary containing time stamps as keys and
         2D spatial grids as values. Time stamps MUST be chronologically

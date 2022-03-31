@@ -3,8 +3,9 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to MRPinterpolation's documentation!
-============================================
+VPint: Value Propagation-based Spatial Interpolation
+====================================================
+Welcome to VPint's documentation! For the moment, the documentation in this document will be rather bare-bones, aimed at allowing users to easily understand what the code is doing.
 
 .. toctree::
    :maxdepth: 2
