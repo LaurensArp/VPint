@@ -1,4 +1,4 @@
-SMRP
+MRP
 ----
 
 .. automodule:: VPint.MRP
