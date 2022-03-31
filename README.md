@@ -3,6 +3,10 @@ This repository contains the code required to run VPint (value propagation-based
 
 There are currently two versions of VPint, both of which are governed by update rules inspired by Markov reward processes. In the ideal case WP-MRP is used, which requires a target image (with NaNs denoting missing values, or with a mask of missing values) and a feature image containing values of the same area adhering to a similar spatial structure. If no feature data is available, SD-MRP can be used, though this will tend to regress to initialisation values over distance.
 
+## Documentation
+
+Please refer to the VPint documentation page at https://vpint.readthedocs.io/en/latest/ for detailed documentation of the code.
+
 ## Installation
 To install VPint, please download the repository, navigate to the root folder, 
 and run
