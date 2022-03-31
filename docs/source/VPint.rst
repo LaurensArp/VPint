@@ -1,7 +1,8 @@
-MRPinterpolation
+VPint
 ================
 
 .. toctree::
 
-   MRPinterpolation/SMRP
-   MRPinterpolation/STMRP
+   VPint/MRP
+   VPint/WP_MRP
+   VPint/SD_MRP
