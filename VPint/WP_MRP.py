@@ -35,6 +35,9 @@ class WP_SMRP(SMRP):
         
     find_beta():
         Automatically determine the best value for beta
+        
+    contrast_map():
+        Create a contrast map for a given input image (used in find_beta)
     
     get_weight_grid():
         Returns a grid of weights in a particular direction (can be useful for visualisations and debugging)
@@ -75,7 +78,7 @@ class WP_SMRP(SMRP):
         self._run_method = "predict"
     
             
-    def run(self,iterations=-1,method='exact',auto_terminate=True,auto_terminate_threshold=1e-4,track_delta=False, confidence=False,confidence_model=None,save_gif=False,gif_path="convergence.gif",prioritise_identity=False,priority_intensity='auto',auto_priority_epochs=20,auto_priority_proportion=0.5,auto_priority_strategy='grid',auto_priority_max=10,auto_priority_min=1,auto_priority_max_iter=-1,auto_priority_verbose=False,known_value_bias=0):
+    def run(self,iterations=-1,method='exact',auto_terminate=True,auto_terminate_threshold=1e-4,track_delta=False, confidence=False,confidence_model=None,save_gif=False,gif_path="convergence.gif",prioritise_identity=False,priority_intensity='auto',auto_priority_epochs=20,auto_priority_proportion=0.5,auto_priority_strategy='grid',auto_priority_max=10,auto_priority_min=1,auto_priority_max_iter=-1,auto_priority_subsample_strategy='max_contrast',auto_priority_verbose=False,known_value_bias=0):
         """
         Runs WP-SMRP for the specified number of iterations. Creates a 3D (h,w,4) tensor val_grid, where the z-axis corresponds to a neighbour of each cell, and a 3D (h,w,4) weight tensor weight_grid, where the z-axis corresponds to the weights of every neighbour in val_grid's z-axis. The x and y axes of both tensors are stacked into 2D (h*w,4) matrices (one of which is transposed), after which the dot product is taken between both matrices, resulting in a (h*w,h*w) matrix. As we are only interested in multiplying the same row numbers with the same column numbers, we take the diagonal entries of the computed matrix to obtain a 1D (h*w) vector of updated values (we use numpy's einsum to do this efficiently, without wasting computation on extra dot products). This vector is then divided element-wise by a vector (flattened 2D grid) counting the number of neighbours of each cell, and we use the object's original_grid to replace wrongly updated known values to their original true values. We finally reshape this vector back to the original 2D pred_grid shape of (h,w).
         
@@ -198,7 +201,8 @@ class WP_SMRP(SMRP):
                 priority_intensity = self.find_beta(auto_priority_epochs,auto_priority_proportion,
                                                               search_strategy=auto_priority_strategy, 
                                                               min_val=auto_priority_min,max_val=auto_priority_max,
-                                                              max_sub_iter=auto_priority_max_iter)
+                                                              max_sub_iter=auto_priority_max_iter,
+                                                              subsample_strategy=auto_priority_subsample_strategy)
                 if(auto_priority_verbose):
                     print("Best found priority intensity: " + str(priority_intensity))
             
@@ -321,7 +325,7 @@ class WP_SMRP(SMRP):
         gamma = max(self.min_gamma,min(gamma,self.max_gamma))
         return(gamma)
     
-    def find_beta(self,search_epochs,subsample_proportion,search_strategy='grid',subsample_strategy='max_diff',min_val=0,max_val=10,max_sub_iter=-1):
+    def find_beta(self,search_epochs,subsample_proportion,search_strategy='grid',subsample_strategy='max_contrast',min_val=0,max_val=10,max_sub_iter=-1):
         """
         Automatically sets the identity priority intensity parameter to the best found value. Currently
         only supports random search.
@@ -357,8 +361,28 @@ class WP_SMRP(SMRP):
             
             # Get indices of sorted array
             num_pixels = int(subsample_proportion * len(diff_vec[~np.isnan(diff_vec)]))
-            diff = np.nan_to_num(diff,nan=0.0)
+            diff_vec = np.nan_to_num(diff_vec,nan=0.0)
             temp = np.argpartition(-diff_vec,num_pixels)
+            result_args = temp[:num_pixels]
+            
+            # Replace most different pixels by nan
+            sub_vec[result_args] = np.nan
+            sub_grid = sub_vec.reshape(shp)
+            
+        elif(subsample_strategy=='max_contrast'):
+            sub_grid = self.original_grid.copy()
+            contrast_grid = self.contrast_map(sub_grid)
+            
+            shp = sub_grid.shape
+            size = np.product(shp)
+
+            contrast_vec = contrast_grid.reshape(size)
+            sub_vec = sub_grid.reshape(size)
+            
+            # Get indices of sorted array
+            num_pixels = int(subsample_proportion * len(contrast_vec[~np.isnan(contrast_vec)]))
+            contrast_vec = np.nan_to_num(contrast_vec,nan=0.0)
+            temp = np.argpartition(-contrast_vec,num_pixels)
             result_args = temp[:num_pixels]
             
             # Replace most different pixels by nan
@@ -411,6 +435,56 @@ class WP_SMRP(SMRP):
             print("WARNING: no identity priority intensity better than dummy, please check your code")
             
         return(best_val)
+        
+    
+    def contrast_map(self,grid):
+        """
+        Create a contrast map of the feature grid, which can be used by find_beta to select pixels to sample. Contrast is computed as the mean average distance between a pixel and its neighbours, normalised to a 0-1 range.
+        
+        :param grid: input grid to create a contrast map for
+        :returns: contrast map
+        """
+        height = grid.shape[0]
+        width = grid.shape[1]
+        
+        # Create neighbour count grid
+        neighbour_count_grid = np.ones(grid.shape) * 4
+
+        neighbour_count_grid[:,0] = neighbour_count_grid[:,0] - np.ones(neighbour_count_grid.shape[1])
+        neighbour_count_grid[:,width-1] = neighbour_count_grid[:,width-1] - np.ones(neighbour_count_grid.shape[1])
+
+        neighbour_count_grid[0,:] = neighbour_count_grid[0,:] - np.ones(neighbour_count_grid.shape[0])
+        neighbour_count_grid[height-1,:] = neighbour_count_grid[height-1,:] - np.ones(neighbour_count_grid.shape[0])
+
+        # Create (h*w*4) value grid
+        val_grid = np.zeros((height,width,4))
+        
+        up_grid = np.zeros((height,width))
+        right_grid = np.zeros((height,width))
+        down_grid = np.zeros((height,width))
+        left_grid = np.zeros((height,width))
+
+        up_grid[1:-1,:] = grid[0:-2,:]
+        right_grid[:,0:-2] = grid[:,1:-1]
+        down_grid[0:-2,:] = grid[1:-1,:]
+        left_grid[:,1:-1] = grid[:,0:-2]
+        
+        val_grid[:,:,0] = up_grid
+        val_grid[:,:,1] = right_grid
+        val_grid[:,:,2] = down_grid
+        val_grid[:,:,3] = left_grid
+        
+        # Compute contrast as average absolute distance
+        temp_grid = np.repeat(grid[:,:,np.newaxis],4,axis=2)
+        diff = np.absolute(val_grid-temp_grid)
+        sum_diff = np.nansum(diff,axis=-1)
+        avg_contrast = sum_diff / neighbour_count_grid
+        
+        min_val = np.nanmin(avg_contrast)
+        max_val = np.nanmax(avg_contrast)
+        avg_contrast = np.clip((avg_contrast-min_val)/(max_val-min_val), 0,1)
+        
+        return(avg_contrast)
     
     
     def get_weight_grid(self,method='exact',direction='up'):
