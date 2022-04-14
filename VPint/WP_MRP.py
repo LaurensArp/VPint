@@ -360,8 +360,8 @@ class WP_SMRP(SMRP):
             sub_vec = sub_grid.reshape(size)
             
             # Get indices of sorted array
-            num_pixels = int(subsample_proportion * len(diff_vec[~np.isnan(diff_vec)]))
-            diff_vec = np.nan_to_num(diff_vec,nan=0.0)
+            num_pixels = int(subsample_proportion * len(sub_vec[~np.isnan(sub_vec)]))
+            diff_vec = np.nan_to_num(diff_vec,nan=-1.0)
             temp = np.argpartition(-diff_vec,num_pixels)
             result_args = temp[:num_pixels]
             
@@ -380,8 +380,8 @@ class WP_SMRP(SMRP):
             sub_vec = sub_grid.reshape(size)
             
             # Get indices of sorted array
-            num_pixels = int(subsample_proportion * len(contrast_vec[~np.isnan(contrast_vec)]))
-            contrast_vec = np.nan_to_num(contrast_vec,nan=0.0)
+            num_pixels = int(subsample_proportion * len(sub_vec[~np.isnan(sub_vec)]))
+            contrast_vec = np.nan_to_num(contrast_vec,nan=-1.0)
             temp = np.argpartition(-contrast_vec,num_pixels)
             result_args = temp[:num_pixels]
             
@@ -432,7 +432,8 @@ class WP_SMRP(SMRP):
             raise VPintError("Invalid search strategy: " + str(search_strategy))
                 
         if(best_val==-1):
-            print("WARNING: no identity priority intensity better than dummy, please check your code")
+            print("WARNING: no identity priority intensity better than dummy, please check your code (defaulting to 1)")
+            best_val = 1
             
         return(best_val)
         
