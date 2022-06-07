@@ -7,7 +7,7 @@ from .MRP import SMRP, STMRP, VPintError
 from .SD_MRP import SD_SMRP, SD_STMRP
 from .utils.hide_spatial_data import hide_values_uniform
 
-import time # TODO: remove after debugging
+import math
         
         
 class WP_SMRP(SMRP):
@@ -78,7 +78,7 @@ class WP_SMRP(SMRP):
         self._run_method = "predict"
     
             
-    def run(self,iterations=-1,method='exact',auto_terminate=True,auto_terminate_threshold=1e-4,track_delta=False, confidence=False,confidence_model=None,save_gif=False,gif_path="convergence.gif",prioritise_identity=False,priority_intensity='auto',auto_priority_epochs=20,auto_priority_proportion=0.5,auto_priority_strategy='grid',auto_priority_max=10,auto_priority_min=1,auto_priority_max_iter=-1,auto_priority_subsample_strategy='max_contrast',auto_priority_verbose=False,known_value_bias=0):
+    def run(self,iterations=-1,method='exact',auto_terminate=True,auto_terminate_threshold=1e-4,track_delta=False,  confidence=False,confidence_model=None, save_gif=False,gif_path="convergence.gif", prioritise_identity=False, priority_intensity='auto',auto_priority_epochs=20,auto_priority_proportion=0.5,auto_priority_strategy='grid',auto_priority_max=10,auto_priority_min=1,auto_priority_max_iter=-1,auto_priority_subsample_strategy='max_contrast',auto_priority_verbose=False, known_value_bias=0, resistance=False,epsilon=0.01,mu=1.0):
         """
         Runs WP-SMRP for the specified number of iterations. Creates a 3D (h,w,4) tensor val_grid, where the z-axis corresponds to a neighbour of each cell, and a 3D (h,w,4) weight tensor weight_grid, where the z-axis corresponds to the weights of every neighbour in val_grid's z-axis. The x and y axes of both tensors are stacked into 2D (h*w,4) matrices (one of which is transposed), after which the dot product is taken between both matrices, resulting in a (h*w,h*w) matrix. As we are only interested in multiplying the same row numbers with the same column numbers, we take the diagonal entries of the computed matrix to obtain a 1D (h*w) vector of updated values (we use numpy's einsum to do this efficiently, without wasting computation on extra dot products). This vector is then divided element-wise by a vector (flattened 2D grid) counting the number of neighbours of each cell, and we use the object's original_grid to replace wrongly updated known values to their original true values. We finally reshape this vector back to the original 2D pred_grid shape of (h,w).
         
@@ -229,6 +229,9 @@ class WP_SMRP(SMRP):
         # Track amount of change over iterations
         if(track_delta):
             delta_vec = np.zeros(iterations)
+            
+        # Compute mean value of available values (used for penalisation of strong deviations)
+        target_mean = np.nanmean(self.original_grid)
         
         # Main loop
         
@@ -270,6 +273,31 @@ class WP_SMRP(SMRP):
             new_grid[np.argwhere(~np.isnan(flattened_original))] = flattened_original[np.argwhere(~np.isnan(flattened_original))] # Keep known values from original           
             new_grid = new_grid.reshape((height,width)) # Return to 2D grid
             
+            # Apply 'resistance' to make it harder to deviate further from the mean
+            if(resistance):
+               
+                # Add 'elastic band resistance'
+                # Up until threshold (band length), increase as much as desired (band is slack)
+                # After threshold, add resistance scaled by how far away from threshold we are
+                
+                # Flatten arrays
+                shp = new_grid.shape
+                size = np.product(shp)
+                new_grid_vec = new_grid.reshape(size)
+                pred_grid_vec = self.pred_grid.reshape(size)
+                
+                # Compute delta_y for all pixels
+                delta_y = new_grid_vec - pred_grid_vec
+                
+                # Update pixels < threshold as old + delta # TODO: check if just doing all is faster
+                inds = np.where(new_grid_vec<=mu)
+                new_grid_vec[inds] = pred_grid_vec[inds] + delta_y[inds]
+                
+                # Update pixels > threshold as old + delta - k*old (or old+delta?)
+                inds = np.where(new_grid_vec>mu)
+                new_grid_vec[inds] = pred_grid_vec[inds] + delta_y[inds] - (epsilon*pred_grid_vec[inds])
+            
+            # Compute delta, save to vector and/or auto-terminate where relevant
             if(track_delta or auto_terminate):
                 delta = np.nanmean(np.absolute(new_grid-self.pred_grid)) / np.nanmean(self.pred_grid)
                 if(track_delta):
@@ -280,7 +308,7 @@ class WP_SMRP(SMRP):
                         if(track_delta):
                             delta_vec = delta_vec[0:it+1]
                         break
-
+                
             self.pred_grid = new_grid
             
         self.run_state = True
@@ -702,21 +730,99 @@ class WP_SMRP(SMRP):
         
         self.model.fit(X_train,y_train)
         
-    def estimate_errors(self,hidden_prop=0.8):
+    def estimate_errors(self,hidden_prop=0.8,method='exact'):
         
         # Compute errors at subsampled known cells
         sub_grid = hide_values_uniform(self.original_grid.copy(),hidden_prop)
         sub_MRP = WP_SMRP(sub_grid,self.feature_grid.copy(),None)
-        sub_pred_grid = sub_MRP.run(100,method=self.run_method)
+        sub_pred_grid = sub_MRP.run(100,method=method)
         err_grid = np.abs(self.original_grid.copy() - sub_pred_grid)
         # TODO replace known values
 
         # Predict errors for truly unknown cells
         sub_MRP = SD_SMRP(err_grid)
-        err_gamma = sub_MRP.find_gamma(100,0.8,max_gamma=np.max(self.original_grid))
+        err_gamma = sub_MRP.find_gamma(100,hidden_prop)
         err_grid_full = sub_MRP.run(100)
         
         return(err_grid_full)
+    
+    def confidence_map(self,hidden_prop=0.8,interp_method="SD_MRP"):
+        
+        # Compute errors at subsampled known cells
+        sub_grid = hide_values_uniform(self.original_grid.copy(),hidden_prop)
+        sub_MRP = WP_SMRP(sub_grid,self.feature_grid.copy())
+        sub_pred_grid = sub_MRP.run()
+        err_grid = np.absolute(self.original_grid.copy() - sub_pred_grid)
+        
+        # Normalise to 0-1 confidence range
+        min_val = np.nanmin(err_grid)
+        max_val = np.nanmax(err_grid)
+        t1 = (err_grid-min_val)
+        t2 = (max_val-min_val)
+        conf_grid = np.clip(t1/t2,0,1)
+        conf_grid = 1 - conf_grid
+
+        # Predict errors for truly unknown cells
+        if(interp_method=="SD_MRP"):
+            sub_MRP = SD_SMRP(conf_grid,init_strategy="zero")
+            conf_gamma = sub_MRP.find_gamma(100,hidden_prop)
+            conf_grid_final = sub_MRP.run(100)
+        elif(interp_method=="WP_MRP"):
+            from sklearn.linear_model import LinearRegression
+            sub_MRP = WP_SMRP(conf_grid,self.feature_grid.copy(),model=LinearRegression())
+            sub_MRP.train()
+            conf_grid_final = sub_MRP.run(method="predict")
+        
+        return(conf_grid_final)
+    
+    def confidence_map2(self,hidden_prop=0.8,interp_method="WP_MRP",smooth=True,kernel_size=3,smooth_iterations=1):
+        
+        # Compute errors at subsampled known cells
+        sub_grid = hide_values_uniform(self.original_grid.copy(),hidden_prop)
+        sub_MRP = WP_SMRP(sub_grid,self.feature_grid.copy())
+        sub_pred_grid = sub_MRP.run()
+        err_grid = np.absolute(self.original_grid.copy() - sub_pred_grid)
+        
+        # Normalise to 0-1 confidence range
+        min_val = np.nanmin(err_grid)
+        max_val = np.nanmax(err_grid)
+        t1 = (err_grid-min_val)
+        t2 = (max_val-min_val)
+        conf_grid = np.clip(t1/t2,0,1)
+        conf_grid = 1 - conf_grid
+
+        # Predict errors for truly unknown cells
+        if(interp_method=="SD_MRP"):
+            sub_MRP = SD_SMRP(conf_grid,init_strategy="zero")
+            conf_gamma = sub_MRP.find_gamma(100,hidden_prop)
+            conf_grid_final = sub_MRP.run(100)
+        elif(interp_method=="WP_MRP"):
+            try:
+                import cv2
+            except:
+                raise VPintError("Failed to import cv2; please install it to use this functionality")
+            contr_map = self.contrast_map(self.feature_grid.copy()[:,:,0])
+            diff_map = np.absolute(self.feature_grid[:,:,0] - self.original_grid)
+            #diff_map = 1 - np.clip((diff_map-np.nanmin(diff_map))/(np.nanmax(diff_map)-np.nanmin(diff_map)),0,1)
+            sub_MRP = WP_SMRP(diff_map,contr_map)
+            conf_grid_final = sub_MRP.run()
+            
+            conf_grid_final = 1 - np.clip((conf_grid_final-np.nanmin(conf_grid_final))/(np.nanmax(conf_grid_final)-np.nanmin(conf_grid_final)),0,1)
+            #conf_grid_final[conf_grid_final>1] = 1
+            
+            if(smooth):
+                kernel = np.ones((kernel_size,kernel_size), np.float32)/(kernel_size*kernel_size)
+                for i in range(smooth_iterations):
+                    conf_grid_final = cv2.filter2D(src=conf_grid_final, ddepth=-1, kernel=kernel)
+            
+        
+        sz = np.product(conf_grid.shape)
+        shp = conf_grid.shape
+        conf_grid_final_vec = conf_grid_final.reshape(sz)
+        mask_vec = self.original_grid.copy().reshape(sz)
+        conf_grid_final_vec[~np.isnan(mask_vec)] = 1
+        conf_grid_final = conf_grid_final_vec.reshape(shp)
+        return(conf_grid_final)
          
                
         
