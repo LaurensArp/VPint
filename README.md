@@ -1,5 +1,5 @@
 # VPInt
-This repository contains the code required to run VPint (value propagation-based spatial interpolation). Although working code is available for spatio-temporal interpolation, we recommend spatial interpolation as its preferred use case. The spatio-temporal code is at this point outdated, and its support may get dropped entirely in the future.
+This repository contains the code required to run VPint (value propagation-based spatial interpolation), associated with our DAMI publication VPint: value propagation-based spatial interpolation ( https://doi.org/10.1007/s10618-022-00843-2 ). Although working code is available for spatio-temporal interpolation, we recommend spatial interpolation as its preferred use case. The spatio-temporal code is at this point outdated, and its support may get dropped entirely in the future.
 
 There are currently two versions of VPint, both of which are governed by update rules inspired by Markov reward processes. In the ideal case WP-MRP is used, which requires a target image (with NaNs denoting missing values, or with a mask of missing values) and a feature image containing values of the same area adhering to a similar spatial structure. If no feature data is available, SD-MRP can be used, though this will tend to regress to initialisation values over distance.
 
@@ -73,17 +73,18 @@ result_data = MRP.run(method='predict')
 
 ## Citing this work
 
-To view the initial Master thesis associated with this code, please
-see: https://ada.liacs.nl/papers/ArpEtAl20b.pdf 
+To read our 2022 DAMI paper on VPint, please see: https://doi.org/10.1007/s10618-022-00843-2
+When publishing work using VPint, please cite:
 
-A paper for this work has been accepted for publication in the DAMI 
-journal for the ECML-PKDD journal track (2022). A link to the paper, 
-along with updated BibTeX information, will be added upon publication.
-In the meantime, when using this code for publications, please cite:
-
-    @mastersthesis{Arp2020Markov,
-        Author = {Arp, Laurens},
-        Title = {A Markov Reward Process-Based Approach to Spatial Interpolation},
-        Booktitle = {Master Thesis Computer Science},
-        Year = {2020}
+    @article{ArpEtAl22,
+        author = "Arp, Laurens and Baratchi, Mitra and Hoos, Holger",
+        title = "VPint: value propagation-based spatial interpolation",
+        journal = "Data Mining and Knowledge Discovery",
+        volume = "36",
+        pages = "",
+        publisher = "Springer",
+        year = "2022",
+        issn = "1573-756X",
+        doi = "https://doi.org/10.1007/s10618-022-00843-2",
+        url = "https://link.springer.com/article/10.1007/s10618-022-00843-2",
     }
