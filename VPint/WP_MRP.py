@@ -78,14 +78,21 @@ class WP_SMRP(SMRP):
         self._run_method = "predict"
     
             
-    def run(self,iterations=-1,method='exact',auto_terminate=True,auto_terminate_threshold=1e-4,track_delta=False,  confidence=False,confidence_model=None, save_gif=False,gif_path="convergence.gif", prioritise_identity=False, priority_intensity='auto',auto_priority_epochs=20,auto_priority_proportion=0.5,auto_priority_strategy='grid',auto_priority_max=10,auto_priority_min=1,auto_priority_max_iter=-1,auto_priority_subsample_strategy='max_contrast',auto_priority_verbose=False, known_value_bias=0, resistance=False,epsilon=0.01,mu=1.0):
+    def run(self,iterations=-1,method='exact',auto_terminate=True,auto_terminate_threshold=1e-4,track_delta=False, 
+            confidence=False,confidence_model=None, save_gif=False,gif_path="convergence.gif", 
+            auto_adapt=False,auto_adaptation_epochs=100,auto_adaptation_proportion=0.5, 
+            auto_adaptation_strategy='random',auto_adaptation_max_iter=-1,
+            auto_adaptation_subsample_strategy='max_contrast',
+            auto_adaptation_verbose=False,
+            prioritise_identity=False,priority_intensity=1, known_value_bias=0, 
+            resistance=False,epsilon=0.01,mu=1.0):
         """
         Runs WP-SMRP for the specified number of iterations. Creates a 3D (h,w,4) tensor val_grid, where the z-axis corresponds to a neighbour of each cell, and a 3D (h,w,4) weight tensor weight_grid, where the z-axis corresponds to the weights of every neighbour in val_grid's z-axis. The x and y axes of both tensors are stacked into 2D (h*w,4) matrices (one of which is transposed), after which the dot product is taken between both matrices, resulting in a (h*w,h*w) matrix. As we are only interested in multiplying the same row numbers with the same column numbers, we take the diagonal entries of the computed matrix to obtain a 1D (h*w) vector of updated values (we use numpy's einsum to do this efficiently, without wasting computation on extra dot products). This vector is then divided element-wise by a vector (flattened 2D grid) counting the number of neighbours of each cell, and we use the object's original_grid to replace wrongly updated known values to their original true values. We finally reshape this vector back to the original 2D pred_grid shape of (h,w).
         
         :param iterations: number of iterations used for the state value update function. If not specified, default to 10000, which functions as the maximum number of iterations in case of non-convergence
         :param method: method for computing weights. Options: "predict" (using self.model), "cosine_similarity" (based on feature similarity), "exact" (compute average weight exactly for features)
         :param auto_terminate: if True, automatically terminate once the mean change in values after calling the update rule converges to a value under the auto_termination_threshold. Capped at 10000 iterations by default, though it usually takes under 100 iterations to converge
-        :param auto_terminate_threshold: threshold for the amount of change as a proportion of the mean value of the grid, after which the algorithm automatically terminates
+        :param auto_terminate_threshold: threshold for the amount of change as a proportion of the mean value of the grid, after which the algorithm automatically terminates (this is always relative/scaled to values)
         :param track_delta: if True, return a vector containing the evolution of delta (mean proportion of change per iteration) along with the interpolated grid
         :param confidence: return highly experimental confidence grid with predictions
         :param confidence_model: model used to create confidence grid
@@ -192,23 +199,43 @@ class WP_SMRP(SMRP):
         neighbour_count_grid[height-1,:] = neighbour_count_grid[height-1,:] - np.ones(neighbour_count_grid.shape[0])
         
         neighbour_count_vec = neighbour_count_grid.reshape(width*height)
+        
+        # Search for best parameters
+        if(auto_adapt):
+            params = []
+            if(prioritise_identity):
+                params.append('beta')
+            if(resistance):
+                params.append('epsilon')
+                params.append('mu')
                 
+            params_opt = self.auto_adapt(params, auto_adaptation_epochs,auto_adaptation_proportion,
+                                                          search_strategy=auto_adaptation_strategy, 
+                                                          max_sub_iter=auto_adaptation_max_iter,
+                                                          subsample_strategy=auto_adaptation_subsample_strategy)
+            if(auto_adaptation_verbose):
+                print("Best found params: " + str(params_opt))
+            for k,v in params_opt.items():
+                if(k=='beta'):
+                    priority_intensity = params_opt[k]
+                elif(k=='epsilon'):
+                    epsilon = params_opt[k]
+                elif(k=='mu'):
+                    mu = params_opt[k]
+                
+        if(priority_intensity==0):
+            prioritise_identity=False
         if(prioritise_identity):
             # Prioritise weights close to 1, under the assumption they will be
             # more informative/constant. 
             
-            if(priority_intensity=='auto'):
-                priority_intensity = self.find_beta(auto_priority_epochs,auto_priority_proportion,
-                                                              search_strategy=auto_priority_strategy, 
-                                                              min_val=auto_priority_min,max_val=auto_priority_max,
-                                                              max_sub_iter=auto_priority_max_iter,
-                                                              subsample_strategy=auto_priority_subsample_strategy)
-                if(auto_priority_verbose):
-                    print("Best found priority intensity: " + str(priority_intensity))
-            
-            priority_grid = weight_grid.copy()
-            priority_grid[priority_grid>1] = 1/priority_grid[priority_grid>1] * (1/priority_grid[priority_grid>1] / (1/priority_grid[priority_grid>1] * priority_intensity))
-            priority_grid[priority_grid<1] = priority_grid[priority_grid<1] * (priority_grid[priority_grid<1] / ((priority_grid[priority_grid<1]+0.001) * priority_intensity))
+            if(priority_intensity==0):
+                # Same as no priority
+                priority_grid = np.ones(weight_grid.shape)
+            else:
+                priority_grid = weight_grid.copy()
+                priority_grid[priority_grid>1] = 1/priority_grid[priority_grid>1] * (1/priority_grid[priority_grid>1] / (1/priority_grid[priority_grid>1] * priority_intensity))
+                priority_grid[priority_grid<1] = priority_grid[priority_grid<1] * (priority_grid[priority_grid<1] / ((priority_grid[priority_grid<1]+0.001) * priority_intensity))
             
             # Prioritise known values
             if(known_value_bias>0):
@@ -353,7 +380,339 @@ class WP_SMRP(SMRP):
         gamma = max(self.min_gamma,min(gamma,self.max_gamma))
         return(gamma)
     
-    def find_beta(self,search_epochs,subsample_proportion,search_strategy='grid',subsample_strategy='max_contrast',min_val=0,max_val=10,max_sub_iter=-1):
+    def auto_adapt(self,params,search_epochs,subsample_proportion,search_strategy='random',subsample_strategy='max_contrast',ranges={},max_sub_iter=-1,hill_climbing_threshold=5):
+        """
+        Automatically sets the identity priority intensity parameter to the best found value. Currently
+        only supports random search.
+        
+        :param params: dict of parameters to search for (supported: beta, epsilon, mu)
+        :param search_epochs: number of epochs used by the random search
+        :param subsample_proportion: proportion of training data used to compute errors
+        :returns: best found value for identity priority intensity
+        """         
+
+        # Subsample
+        if(subsample_strategy=='random'):
+            sub_grid = self.original_grid.copy()
+
+            shp = sub_grid.shape
+            size = np.product(shp)
+
+            rand_vec = np.random.rand(size)
+            sub_vec = sub_grid.reshape(size)
+
+            sub_vec[rand_vec<subsample_proportion] = np.nan
+            sub_grid = sub_vec.reshape(shp)
+
+
+        elif(subsample_strategy=='max_diff'):
+            sub_grid = self.original_grid.copy()
+            diff = np.absolute(self.original_grid - np.mean(self.feature_grid,axis=2))
+            
+            shp = sub_grid.shape
+            size = np.product(shp)
+
+            diff_vec = diff.reshape(size)
+            sub_vec = sub_grid.reshape(size)
+            
+            # Get indices of sorted array
+            num_pixels = int(subsample_proportion * len(sub_vec[~np.isnan(sub_vec)]))
+            diff_vec = np.nan_to_num(diff_vec,nan=-1.0)
+            temp = np.argpartition(-diff_vec,num_pixels)
+            result_args = temp[:num_pixels]
+            
+            # Replace most different pixels by nan
+            sub_vec[result_args] = np.nan
+            sub_grid = sub_vec.reshape(shp)
+            
+        elif(subsample_strategy=='max_contrast'):
+            sub_grid = self.original_grid.copy()
+            contrast_grid = self.contrast_map(sub_grid)
+            
+            shp = sub_grid.shape
+            size = np.product(shp)
+
+            contrast_vec = contrast_grid.reshape(size)
+            sub_vec = sub_grid.reshape(size)
+            
+            # Get indices of sorted array
+            num_pixels = int(subsample_proportion * len(sub_vec[~np.isnan(sub_vec)]))
+            contrast_vec = np.nan_to_num(contrast_vec,nan=-1.0)
+            temp = np.argpartition(-contrast_vec,num_pixels)
+            result_args = temp[:num_pixels]
+            
+            # Replace most different pixels by nan
+            sub_vec[result_args] = np.nan
+            sub_grid = sub_vec.reshape(shp)
+            
+        else:
+            raise VPintError("Invalid subsample strategy: " + str(subsample_strategy))
+            
+        # Set bounds/distribution if specified, default otherwise
+        bounds = {'beta':(0,4),'epsilon':(0.1,0.01),
+                  'mu':(np.nanmean(self.original_grid),3*np.nanmean(self.original_grid))}
+        for k,v in ranges:
+            bounds[k] = v
+            
+        # Initialise params, best stuff
+        best_loss = np.inf
+        best_val = {}
+        for k in params:
+            if(k not in ['beta','epsilon','mu']):
+                raise VPintError("Invalid parameter to optimise: " + str(k))
+            best_val[k] = -1
+        
+        if(search_strategy=='random'):
+            ran_default = False
+            for ep in range(0,search_epochs):
+                # Random search for best val for search_epochs iterations
+
+                temp_MRP = WP_SMRP(sub_grid,self.feature_grid.copy())
+                
+                # Make sure to check defaults first, explore randomly otherwise
+                if(not(ran_default)):
+                    vals = {}
+                    for k in params:
+                        if(k=='beta'):
+                            vals[k] = 1
+                        if(k=='epsilon'):
+                            vals[k] = 0
+                        if(k=='mu'):
+                            vals[k] = np.nanmean(self.original_grid) + 2*np.nanstd(self.original_grid)
+                    ran_default = True
+                else:
+                    vals = {}
+                    for k in params:
+                        if(k=='beta'):
+                            vals[k] = np.random.randint(low=bounds[k][0],high=bounds[k][1])
+                        if(k=='epsilon'):
+                            # Technically not min/max, but mean/std. Bounded by 0-1
+                            #vals[k] = min(max(0,np.random.normal(bounds[k][0],bounds[k][1])),1)
+                            vals[k] = min(max(0,np.random.uniform(low=0,high=0.3)),1)
+                        if(k=='mu'):
+                            vals[k] = np.random.uniform(low=bounds[k][0],high=bounds[k][1])
+
+                # Kind of hacky, for different combinations of parameters
+                # Currently mu can only be optimised if epsilon is too
+                if('beta' in vals and 'epsilon' in vals):
+                    if('mu' in vals):
+                        mu = vals['mu']
+                    else:
+                        mu = np.nanmean(self.original_grid) + 2*np.nanstd(self.original_grid)
+                    pred_grid = temp_MRP.run(prioritise_identity=True, priority_intensity=vals['beta'], 
+                                             iterations=max_sub_iter, auto_adapt=False,
+                                             resistance=True, epsilon=vals['epsilon'],mu=mu)
+                    
+                elif('beta' in vals and not('epsilon' in vals)):
+                    pred_grid = temp_MRP.run(prioritise_identity=True, priority_intensity=vals['beta'], 
+                                             iterations=max_sub_iter, auto_adapt=False)
+                    
+                elif(not('beta' in vals) and 'epsilon' in vals):
+                    if('mu' in vals):
+                        mu = vals['mu']
+                    else:
+                        mu = np.nanmean(self.original_grid) + 2*np.nanstd(self.original_grid)
+                    pred_grid = temp_MRP.run(resistance=True, epsilon=vals['epsilon'],mu=mu, auto_adapt=False)
+
+                # Compute MAE of subsampled predictions
+                mae = np.nanmean(np.absolute(pred_grid.reshape(np.product(pred_grid.shape)) - self.original_grid.reshape(np.product(self.original_grid.shape))))
+
+                # Update where necessary
+                if(mae < best_loss):
+                    best_vals = vals
+                    best_loss = mae
+
+                temp_MRP.reset()
+                
+        elif(search_strategy=='sequential'):
+            if('beta' not in params and 'epsilon' not in params):
+                raise VPintError("Cannot use sequential auto-adaptation without both beta and epsilon/mu")
+                
+            best_vals = {}
+                
+            # Grid search for beta        
+
+            for val in range(0,8):
+                # Grid search
+
+                temp_MRP = WP_SMRP(sub_grid,self.feature_grid.copy())
+                pred_grid = temp_MRP.run(prioritise_identity=True,priority_intensity=val,iterations=max_sub_iter, 
+                                        auto_adapt=False)
+
+                # Compute MAE of subsampled predictions
+                mae = np.nanmean(np.absolute(pred_grid.reshape(np.product(pred_grid.shape)) - self.original_grid.reshape(np.product(self.original_grid.shape))))
+
+                if(mae < best_loss):
+                    best_val = val
+                    best_loss = mae
+
+                temp_MRP.reset()
+                
+            best_beta = best_val
+            params.pop(params.index('beta'))
+            
+            # Random search for epsilon/mu
+            
+            ran_default = False
+            for ep in range(0,search_epochs):
+                # Random search for best val for search_epochs iterations
+
+                temp_MRP = WP_SMRP(sub_grid,self.feature_grid.copy())
+                
+                # Make sure to check defaults first, explore randomly otherwise
+                if(not(ran_default)):
+                    vals = {}
+                    for k in params:
+                        if(k=='epsilon'):
+                            vals[k] = 0
+                        if(k=='mu'):
+                            vals[k] = np.nanmean(self.original_grid) + 2*np.nanstd(self.original_grid)
+                    ran_default = True
+                else:
+                    vals = {}
+                    for k in params:
+                        if(k=='epsilon'):
+                            # Technically not min/max, but mean/std. Bounded by 0-1
+                            #vals[k] = min(max(0,np.random.normal(bounds[k][0],bounds[k][1])),1)
+                            vals[k] = min(max(0,np.random.uniform(low=0,high=0.5)),1)
+                        if(k=='mu'):
+                            vals[k] = np.random.uniform(low=bounds[k][0],high=bounds[k][1])
+
+                # Kind of hacky, for different combinations of parameters
+                # Currently mu can only be optimised if epsilon is too
+
+                if('mu' in vals):
+                    mu = vals['mu']
+                else:
+                    mu = np.nanmean(self.original_grid) + 2*np.nanstd(self.original_grid)
+                pred_grid = temp_MRP.run(resistance=True, epsilon=vals['epsilon'],mu=mu, auto_adapt=False, 
+                                        prioritise_identity=True, priority_intensity=best_beta)
+
+                # Compute MAE of subsampled predictions
+                mae = np.nanmean(np.absolute(pred_grid.reshape(np.product(pred_grid.shape)) - self.original_grid.reshape(np.product(self.original_grid.shape))))
+
+                # Update where necessary
+                if(mae < best_loss):
+                    best_vals = vals
+                    best_loss = mae
+
+                temp_MRP.reset()
+                
+            best_vals['beta'] = best_beta
+                
+                
+        elif(search_strategy=='hill_climbing'):
+            
+            ran_default = False
+            static_counter = 0
+            for ep in range(0,search_epochs):
+                # Random search for best val for search_epochs iterations
+
+                temp_MRP = WP_SMRP(sub_grid,self.feature_grid.copy())
+                
+                # Make sure to check defaults first
+                if(not(ran_default)):
+                    vals = {}
+                    for k in params:
+                        if(k=='beta'):
+                            vals[k] = 1
+                        if(k=='epsilon'):
+                            vals[k] = 0
+                        if(k=='mu'):
+                            vals[k] = np.nanmean(self.original_grid) + 2*np.nanstd(self.original_grid)
+                else:
+                    for k in params:
+                        if(k=='beta'):
+                            r = np.random.rand()
+                            if(r <= 0.33):
+                                vals[k] = max(bounds[k][0], vals[k]-1)
+                            elif(r > 0.33 and r <= 0.66):
+                                vals[k] = min(bounds[k][1], vals[k]+1)
+                            else:
+                                pass
+                        if(k=='epsilon'):
+                            r = np.random.rand()
+                            # Epsilon bounds are mean/std, can be used for steps
+                            if(r <= 0.33):
+                                vals[k] = max(0, vals[k]-bounds[k][1])
+                            elif(r > 0.33 and r <= 0.66):
+                                vals[k] = min(1, vals[k]+bounds[k][1])
+                            else:
+                                pass
+                        if(k=='mu'):
+                            factor = np.random.uniform(low=0,high=np.nanstd(self.original_grid))
+                            if(r <= 0.33):
+                                vals[k] = max(bounds[k][0], vals[k]-factor)
+                            elif(r > 0.33 and r <= 0.66):
+                                vals[k] = min(bounds[k][1], vals[k]+factor)
+                            else:
+                                pass
+
+                # Kind of hacky, for different combinations of parameters
+                # Currently mu can only be optimised if epsilon is too
+                if('beta' in vals and 'epsilon' in vals):
+                    if('mu' in vals):
+                        mu = vals['mu']
+                    else:
+                        mu = np.nanmean(self.original_grid) + 2*np.nanstd(self.original_grid)
+                    pred_grid = temp_MRP.run(prioritise_identity=True, priority_intensity=vals['beta'], 
+                                             iterations=max_sub_iter, auto_adapt=False,
+                                             resistance=True, epsilon=vals['epsilon'],mu=mu)
+                    
+                elif('beta' in vals and not('epsilon' in vals)):
+                    pred_grid = temp_MRP.run(prioritise_identity=True, priority_intensity=vals['beta'], 
+                                             iterations=max_sub_iter, auto_adapt=False)
+                    
+                elif(not('beta' in vals) and 'epsilon' in vals):
+                    if('mu' in vals):
+                        mu = vals['mu']
+                    else:
+                        mu = np.nanmean(self.original_grid) + 2*np.nanstd(self.original_grid)
+                    pred_grid = temp_MRP.run(resistance=True, epsilon=vals['epsilon'],mu=mu, auto_adapt=False)
+
+                # Compute MAE of subsampled predictions
+                mae = np.nanmean(np.absolute(pred_grid.reshape(np.product(pred_grid.shape)) - self.original_grid.reshape(np.product(self.original_grid.shape))))
+
+                # Update where necessary
+                if(mae < best_loss):
+                    best_vals = vals
+                    best_loss = mae
+                    static_counter = 0
+                else:
+                    # Early stopping if no more improvement
+                    static_counter += 1
+                    if(static_counter >= hill_climbing_threshold):
+                        #print("Early stopping: " + str(ep+1)) # TODO: remove
+                        break
+                        
+                # Set to exploration defaults where appropriate
+                if(not(ran_default)):
+                    vals = {}
+                    for k in params:
+                        if(k=='beta'):
+                            vals[k] = 1
+                        if(k=='epsilon'):
+                            vals[k] = 0.1
+                        if(k=='mu'):
+                            vals[k] = np.nanmean(self.original_grid) + 2*np.nanstd(self.original_grid)
+                    ran_default = True
+                    
+                temp_MRP.reset()
+                
+
+        else:
+            raise VPintError("Invalid search strategy: " + str(search_strategy))
+        
+        for k,v in best_vals.items():
+            if(k in params and v==-1):
+                print("WARNING: no " + k + " better than dummy, please check your code (defaulting to 1)")
+                best_vals[k] = 1
+            if(not(k in params)):
+                best_vals.pop(k) # Remove parameters that were not optimised
+            
+        return(best_vals)
+    
+    def find_beta_old(self,search_epochs,subsample_proportion,search_strategy='grid',subsample_strategy='max_contrast',min_val=0,max_val=10,max_sub_iter=-1):
         """
         Automatically sets the identity priority intensity parameter to the best found value. Currently
         only supports random search.
@@ -428,7 +787,10 @@ class WP_SMRP(SMRP):
                 # Random search for best val for search_epochs iterations
 
                 temp_MRP = WP_SMRP(sub_grid,self.feature_grid.copy())
-                val = np.random.randint(low=min_val,high=max_val)
+                if(best_val==-1):
+                    val = 1 # try default first
+                else:
+                    val = np.random.randint(low=min_val,high=max_val)
                 pred_grid = temp_MRP.run(prioritise_identity=True,priority_intensity=val,iterations=max_sub_iter)
 
                 # Compute MAE of subsampled predictions
@@ -441,6 +803,19 @@ class WP_SMRP(SMRP):
                 temp_MRP.reset()
                 
         elif(search_strategy=='grid'):
+            val = 1 # try default first
+            temp_MRP = WP_SMRP(sub_grid,self.feature_grid.copy())
+            pred_grid = temp_MRP.run(prioritise_identity=True,priority_intensity=val,iterations=max_sub_iter)
+
+            # Compute MAE of subsampled predictions
+            mae = np.nanmean(np.absolute(pred_grid.reshape(np.product(pred_grid.shape)) - self.original_grid.reshape(np.product(self.original_grid.shape))))
+
+            if(mae < best_loss):
+                best_val = val
+                best_loss = mae
+
+            temp_MRP.reset()
+                
             for val in range(min_val,max_val):
                 # Random search for best val for search_epochs iterations
 
@@ -1039,8 +1414,7 @@ class WP_STMRP(STMRP):
             f1_temp[f1_temp == 0] = 0.01
             gamma = np.mean(f2 / f1_temp) 
         else:
-            print("Invalid method")
-            intentionalcrash # TODO: start throwing proper exceptions...
+            raise VPintError("Invalid method: " + method)
         return(gamma)
     
             
