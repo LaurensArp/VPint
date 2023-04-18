@@ -5,7 +5,7 @@ There are currently two versions of VPint, both of which are governed by update 
 
 ## Documentation
 
-Please refer to the VPint documentation page at https://vpint.readthedocs.io/en/latest/ for detailed documentation of the code.
+The code contains docstraings with detailed explanations. We hope to move this documentation to ReadTheDocs when we can. 
 
 ## Installation
 To install VPint, please download the repository, navigate to the root folder, 
