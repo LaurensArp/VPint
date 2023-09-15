@@ -79,7 +79,7 @@ class WP_SMRP(SMRP):
     
             
     def run(self,iterations=-1,method='exact',auto_terminate=True,auto_terminate_threshold=1e-4,track_delta=False, 
-            confidence=False,confidence_model=None, save_gif=False,gif_path="convergence.gif", 
+            confidence=False,confidence_model=None, save_gif=False,gif_path="convergence.gif", gif_ms_per_frame=100, store_gif_source=False,
             auto_adapt=False,auto_adaptation_epochs=100,auto_adaptation_proportion=0.5, 
             auto_adaptation_strategy='random',auto_adaptation_max_iter=-1,
             auto_adaptation_subsample_strategy='max_contrast',
@@ -110,6 +110,9 @@ class WP_SMRP(SMRP):
             auto_terminate = False
         else:
             iterations = 5000
+
+        if(save_gif):
+            progression = np.zeros((iterations, self.pred_grid.shape[0], self.pred_grid.shape[1]))
                
         # Setup all this once
         
@@ -334,12 +337,27 @@ class WP_SMRP(SMRP):
                         self.pred_grid = new_grid
                         if(track_delta):
                             delta_vec = delta_vec[0:it+1]
+                        if(save_gif or store_gif_source):
+                            progression = progression[:it, :, :]
                         break
+
+            if(save_gif or store_gif_source):
+                progression[it, :, :] = new_grid.copy()
                 
             self.pred_grid = new_grid
             
         self.run_state = True
         self.run_method = method
+
+        if(store_gif_source):
+            self.progression = progression
+
+        if(save_gif):
+            from PIL import Image
+            progression = (progression / np.nanmax(progression) * 255)
+            gif_data = [Image.fromarray(progression[it,:,:]) for it in range(0, progression.shape[0])]
+            gif_data[0].save(gif_path, save_all=True, append_images=gif_data[1:], duration=gif_ms_per_frame, loop=0)
+
                         
         if(track_delta):
             return(self.pred_grid,delta_vec)
@@ -841,6 +859,10 @@ class WP_SMRP(SMRP):
         return(best_val)
         
     
+    def get_progression(self):
+        return(self.progression)
+
+
     def contrast_map(self,grid):
         """
         Create a contrast map of the feature grid, which can be used by find_beta to select pixels to sample. Contrast is computed as the mean average distance between a pixel and its neighbours, normalised to a 0-1 range.
