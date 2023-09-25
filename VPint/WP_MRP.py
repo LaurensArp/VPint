@@ -78,14 +78,15 @@ class WP_SMRP(SMRP):
         self._run_method = "predict"
     
             
-    def run(self,iterations=-1,method='exact',auto_terminate=True,auto_terminate_threshold=1e-4,track_delta=False, 
-            confidence=False,confidence_model=None, save_gif=False,gif_path="convergence.gif", gif_ms_per_frame=100, store_gif_source=False,
+    def run(self, iterations=-1, method='exact', auto_terminate=True, auto_terminate_threshold=1e-4, track_delta=False, 
+            confidence=False, confidence_model=None, 
+            save_gif=False, gif_path="convergence.gif", gif_ms_per_frame=100, store_gif_source=False, gif_size_up=20, gif_clip_iter=100,
             auto_adapt=False,auto_adaptation_epochs=100,auto_adaptation_proportion=0.5, 
             auto_adaptation_strategy='random',auto_adaptation_max_iter=-1,
             auto_adaptation_subsample_strategy='max_contrast',
             auto_adaptation_verbose=False,
-            prioritise_identity=False,priority_intensity=1, known_value_bias=0, 
-            resistance=False,epsilon=0.01,mu=1.0):
+            prioritise_identity=False, priority_intensity=1, known_value_bias=0, 
+            resistance=False, epsilon=0.01, mu=1.0):
         """
         Runs WP-SMRP for the specified number of iterations. Creates a 3D (h,w,4) tensor val_grid, where the z-axis corresponds to a neighbour of each cell, and a 3D (h,w,4) weight tensor weight_grid, where the z-axis corresponds to the weights of every neighbour in val_grid's z-axis. The x and y axes of both tensors are stacked into 2D (h*w,4) matrices (one of which is transposed), after which the dot product is taken between both matrices, resulting in a (h*w,h*w) matrix. As we are only interested in multiplying the same row numbers with the same column numbers, we take the diagonal entries of the computed matrix to obtain a 1D (h*w) vector of updated values (we use numpy's einsum to do this efficiently, without wasting computation on extra dot products). This vector is then divided element-wise by a vector (flattened 2D grid) counting the number of neighbours of each cell, and we use the object's original_grid to replace wrongly updated known values to their original true values. We finally reshape this vector back to the original 2D pred_grid shape of (h,w).
         
@@ -353,9 +354,17 @@ class WP_SMRP(SMRP):
             self.progression = progression
 
         if(save_gif):
+            # WIP, currently not working (this is for RGB, VPint is band-specific, would need to re-code into multi-band wrapper)
             from PIL import Image
-            progression = (progression / np.nanmax(progression) * 255)
-            gif_data = [Image.fromarray(progression[it,:,:]) for it in range(0, progression.shape[0])]
+            progression = (progression / np.nanmax(progression[0:gif_clip_iter, :, :, :]) * 255)
+            progression = progression.clip(0, 255.0)
+
+            res = np.repeat(progression, gif_size_up, axis=1)
+            res = res.reshape((progression.shape[0], progression.shape[1]*gif_size_up, progression.shape[2], progression.shape[3]))
+            res = np.repeat(res, gif_size_up, axis=2)
+            res = res.reshape((progression.shape[0], progression.shape[1]*gif_size_up, progression.shape[2]*gif_size_up, progression.shape[3]))
+
+            gif_data = [Image.fromarray(progression[it,:,:,:].astype(np.uint8), 'RGB') for it in range(0, progression.shape[0])]
             gif_data[0].save(gif_path, save_all=True, append_images=gif_data[1:], duration=gif_ms_per_frame, loop=0)
 
                         
