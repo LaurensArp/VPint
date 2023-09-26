@@ -227,8 +227,8 @@ class WP_SMRP(SMRP):
                 elif(k=='mu'):
                     mu = params_opt[k]
                 
-        if(priority_intensity==0):
-            prioritise_identity=False
+        #if(priority_intensity==0):
+        #    prioritise_identity=False
         if(prioritise_identity):
             # Prioritise weights close to 1, under the assumption they will be
             # more informative/constant. 
@@ -292,7 +292,7 @@ class WP_SMRP(SMRP):
                 # element wise multiplication weight+vals
                 individual_predictions = np.multiply(weight_matrix.transpose(),val_matrix)
                 # dot product with priority weights
-                new_grid = np.einsum('ij,ji->i', individual_predictions,priority_grid.reshape(height*width,4).transpose()) 
+                new_grid = np.einsum('ij,ji->i', individual_predictions,priority_grid.reshape(height*width,4).transpose())              
                 # divide by sum of priority weights
                 new_grid = new_grid / np.sum(priority_grid,axis=2).reshape(height*width)
                 
