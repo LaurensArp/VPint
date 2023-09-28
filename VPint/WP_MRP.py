@@ -147,12 +147,12 @@ class WP_SMRP(SMRP):
             down_grid = np.ones((height,width,feature_size))
             left_grid = np.ones((height,width,feature_size))
 
-            up_grid[1:-1,:,:] = f_grid[0:-2,:,:]
-            right_grid[:,0:-2,:] = f_grid[:,1:-1,:]
-            down_grid[0:-2,:,:] = f_grid[1:-1,:,:]
-            left_grid[:,1:-1,:] = f_grid[:,0:-2,:]
+            up_grid[1:,:,:] = f_grid[0:-1,:,:]
+            right_grid[:,0:-1,:] = f_grid[:,1:,:]
+            down_grid[0:-1,:,:] = f_grid[1:,:,:]
+            left_grid[:,1:,:] = f_grid[:,0:-1,:]
 
-            # Compute weights exacly
+            # Compute weights exacly (coming in from direction to source, e.g., up means going from neighbour above to source)
 
             up_weights = np.mean(f_grid / up_grid, axis=2)
             up_weights[0,:] = 0
@@ -189,7 +189,7 @@ class WP_SMRP(SMRP):
                         vec[3] = self.predict_weight(f1,f2,method)
 
                     weight_grid[i,j,:] = vec
-        
+
         weight_matrix = weight_grid.reshape((height*width,4)).transpose()
         
         # Set neighbour count grid

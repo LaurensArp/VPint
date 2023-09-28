@@ -94,7 +94,7 @@ class MRP:
         """Return pred_grid
         
         :returns: pred_grid"""
-        self.update_grid()
+        #self.update_grid()
         return(self.pred_grid)
         
     def apply_mask(self,grid,mask):
