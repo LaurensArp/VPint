@@ -270,19 +270,19 @@ class WP_SMRP(SMRP):
             # Set val_grid
             
             # Up
-            val_grid[1:h+1,:,0] = self.pred_grid[0:h,:] # +1 because it's non-inclusive (0:10 means 0-9)
+            val_grid[1:,:,0] = self.pred_grid[0:-1,:]
             val_grid[0,:,0] = np.zeros((width))
-            
+
             # Right
-            val_grid[:,0:w,1] = self.pred_grid[:,1:w+1]
-            val_grid[:,w,1] = np.zeros((height))
-            
+            val_grid[:,0:-1,1] = self.pred_grid[:,1:]
+            val_grid[:,-1,1] = np.zeros((height))
+
             # Down
-            val_grid[0:h,:,2] = self.pred_grid[1:h+1,:]
-            val_grid[h,:,2] = np.zeros((width))
-            
+            val_grid[0:-1,:,2] = self.pred_grid[1:,:]
+            val_grid[-1,:,2] = np.zeros((width))
+
             # Left
-            val_grid[:,1:w+1,3] = self.pred_grid[:,0:w]
+            val_grid[:,1:,3] = self.pred_grid[:,0:-1]
             val_grid[:,0,3] = np.zeros((height))
                         
             # Compute new values, update pred grid
