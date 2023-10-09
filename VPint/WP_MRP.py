@@ -236,10 +236,17 @@ class WP_SMRP(SMRP):
             if(priority_intensity==0):
                 # Same as no priority
                 priority_grid = np.ones(weight_grid.shape)
+                # Since we later divide by sum of priority weights (replacing neighbour count grid),
+                # we need to set some 0s for edges
+                priority_grid[0,:,0] = 0.0 # up
+                priority_grid[:,-1,1] = 0.0 # right
+                priority_grid[-1,:,2] = 0.0 # down
+                priority_grid[:,0,3] = 0.0 # left
             else:
                 priority_grid = weight_grid.copy()
                 priority_grid[priority_grid>1] = 1/priority_grid[priority_grid>1] * (1/priority_grid[priority_grid>1] / (1/priority_grid[priority_grid>1] * priority_intensity))
                 priority_grid[priority_grid<1] = priority_grid[priority_grid<1] * (priority_grid[priority_grid<1] / ((priority_grid[priority_grid<1]+0.001) * priority_intensity))
+            self.priority_grid = priority_grid # for debugging access
             
             # Prioritise known values
             if(known_value_bias>0):
