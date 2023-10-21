@@ -212,20 +212,27 @@ class WP_SMRP(SMRP):
             if(resistance):
                 params.append('epsilon')
                 params.append('mu')
-                
-            params_opt = self.auto_adapt(params, auto_adaptation_epochs,auto_adaptation_proportion,
-                                                          search_strategy=auto_adaptation_strategy, 
-                                                          max_sub_iter=auto_adaptation_max_iter,
-                                                          subsample_strategy=auto_adaptation_subsample_strategy)
-            if(auto_adaptation_verbose):
-                print("Best found params: " + str(params_opt))
-            for k,v in params_opt.items():
-                if(k=='beta'):
-                    priority_intensity = params_opt[k]
-                elif(k=='epsilon'):
-                    epsilon = params_opt[k]
-                elif(k=='mu'):
-                    mu = params_opt[k]
+            
+            # In case some configurations cause, e.g., overflow issues
+            fail_counter = 0
+            while True: 
+                if(fail_counter >= 3):
+                    print("Auto-adaptation failed 3 times; proceeding with default parameters")
+                    break
+                try:
+                    params_opt = self.auto_adapt(params, auto_adaptation_epochs,auto_adaptation_proportion, search_strategy=auto_adaptation_strategy, max_sub_iter=auto_adaptation_max_iter, subsample_strategy=auto_adaptation_subsample_strategy)
+                    if(auto_adaptation_verbose):
+                        print("Best found params: " + str(params_opt))
+                    for k,v in params_opt.items():
+                        if(k=='beta'):
+                            priority_intensity = params_opt[k]
+                        elif(k=='epsilon'):
+                            epsilon = params_opt[k]
+                        elif(k=='mu'):
+                            mu = params_opt[k]
+                    break
+                except:
+                    fail_counter += 1
                 
         #if(priority_intensity==0):
         #    prioritise_identity=False
