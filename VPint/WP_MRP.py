@@ -52,7 +52,7 @@ class WP_SMRP(SMRP):
         compute an indication of uncertainty per pixel in pred_grid
     """    
     
-    def __init__(self,grid,feature_grid,model=None,init_strategy='mean',max_gamma=np.inf,min_gamma=0,mask=None):
+    def __init__(self,grid,feature_grid,model=None,init_strategy='mean',max_gamma=np.inf,min_gamma=0,mask=None,clip_val=np.inf):
         # Check shapes
         if(grid.shape[0] != feature_grid.shape[0] or grid.shape[1] != feature_grid.shape[1]):
             raise VPintError("Target and feature grids have different shapes: " + str(grid.shape) + " and " + str(feature_grid.shape))
@@ -74,6 +74,7 @@ class WP_SMRP(SMRP):
         self.model = model 
         self.max_gamma = max_gamma
         self.min_gamma = min_gamma
+        self.clip_val = clip_val
         self._run_state = False
         self._run_method = "predict"
     
@@ -86,7 +87,8 @@ class WP_SMRP(SMRP):
             auto_adaptation_subsample_strategy='max_contrast',
             auto_adaptation_verbose=False,
             prioritise_identity=False, priority_intensity=1, known_value_bias=0, 
-            resistance=False, epsilon=0.01, mu=1.0):
+            resistance=False, epsilon=0.01, mu=1.0, 
+            clip_val=np.inf):
         """
         Runs WP-SMRP for the specified number of iterations. Creates a 3D (h,w,4) tensor val_grid, where the z-axis corresponds to a neighbour of each cell, and a 3D (h,w,4) weight tensor weight_grid, where the z-axis corresponds to the weights of every neighbour in val_grid's z-axis. The x and y axes of both tensors are stacked into 2D (h*w,4) matrices (one of which is transposed), after which the dot product is taken between both matrices, resulting in a (h*w,h*w) matrix. As we are only interested in multiplying the same row numbers with the same column numbers, we take the diagonal entries of the computed matrix to obtain a 1D (h*w) vector of updated values (we use numpy's einsum to do this efficiently, without wasting computation on extra dot products). This vector is then divided element-wise by a vector (flattened 2D grid) counting the number of neighbours of each cell, and we use the object's original_grid to replace wrongly updated known values to their original true values. We finally reshape this vector back to the original 2D pred_grid shape of (h,w).
         
@@ -116,6 +118,8 @@ class WP_SMRP(SMRP):
             progression = np.zeros((iterations, self.pred_grid.shape[0], self.pred_grid.shape[1]))
                
         # Setup all this once
+        
+        self.clip_val = clip_val
         
         height = self.pred_grid.shape[0]
         width = self.pred_grid.shape[1]
@@ -315,6 +319,7 @@ class WP_SMRP(SMRP):
                 new_grid = new_grid / neighbour_count_vec # Correct for neighbour count
                 
             flattened_original = self.original_grid.copy().reshape((height*width)) # can't use argwhere with 2D indexing
+            new_grid[new_grid > self.clip_val] = self.clip_val # If set to lower than inf, prevent values from rising past threshold
             new_grid[np.argwhere(~np.isnan(flattened_original))] = flattened_original[np.argwhere(~np.isnan(flattened_original))] # Keep known values from original           
             new_grid = new_grid.reshape((height,width)) # Return to 2D grid
             
