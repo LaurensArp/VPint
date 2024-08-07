@@ -1,7 +1,5 @@
 # VPInt
-This repository contains the code required to run VPint (value propagation-based spatial interpolation), associated with our DAMI publication VPint: value propagation-based spatial interpolation ( https://doi.org/10.1007/s10618-022-00843-2 ). Although working code is available for spatio-temporal interpolation, we recommend spatial interpolation as its preferred use case. The spatio-temporal code is at this point outdated, and its support may get dropped entirely in the future.
-
-There are currently two versions of VPint, both of which are governed by update rules inspired by Markov reward processes. In the ideal case WP-MRP is used, which requires a target image (with NaNs denoting missing values, or with a mask of missing values) and a feature image containing values of the same area adhering to a similar spatial structure. If no feature data is available, SD-MRP can be used, though this will tend to regress to initialisation values over distance.
+This repository contains the code required to run VPint (value propagation-based spatial interpolation), associated with our DAMI publication VPint: value propagation-based spatial interpolation (https://doi.org/10.1007/s10618-022-00843-2), and VPint2, associated with our ISPRS Journal of Photogrammetry and Remote Sensing paper (https://doi.org/10.1016/j.isprsjprs.2024.07.030). 
 
 ## Documentation
 
@@ -19,9 +17,6 @@ pip install -r requirements.txt
 python setup.py install
 ```
 
-Optional depdendencies:
-* Scikit-image      0.17.2 (used for computing the SSIM performance metric)
-* Rasterio          1.3.10 (used by utils to load EO data products)
 
 ## Running VPint2 for cloud removal in Earth Observation data
 A minimal example to run VPint2 cloud removal, assuming appropriate data is already loaded:
@@ -33,9 +28,12 @@ VPint2 = VPint2_interpolator(target, features, mask=mask)
 target_clean = VPint2.run()
 ```
 
-For more details, please see the cloud_removal_example.ipynb notebook in the examples folder, and the accompanying blog post/tutorial (coming up).
+For more details, please see the cloud_removal_example.ipynb notebook in the examples folder, and the accompanying blog post/tutorial here: https://adaresearch.wordpress.com/2024/08/07/removing-clouds-from-optical-earth-observation-imagery-using-vpint2-in-2-lines-of-python-code/.
 
 
+## Further questions
+
+If you have further questions, please feel free to reach out to me at my work email address specified in the paper.
 
 
 ## Citing this work
