@@ -1,5 +1,2 @@
-matplotlib @ file:///croot/matplotlib-suite_1713336378214/work
-matplotlib-inline @ file:///work/perseverance-python-buildout/croot/matplotlib-inline_1698864771271/work
-numpy @ file:///croot/numpy_and_numpy_base_1708638617955/work/dist/numpy-1.26.4-cp312-cp312-linux_x86_64.whl#sha256=1d700f51d8b4fa684d858c9e3b56b1656bc5c82b6b79ff08d4e3b491c430059f
-setuptools==69.5.1
-wheel==0.43.0
+matplotlib~=3.8.4
+numpy~=1.26.4
