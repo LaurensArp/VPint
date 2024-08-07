@@ -10,7 +10,7 @@ import multiprocessing
 from .WP_MRP import *
 
 class VPint2_interpolator():
-    def __init__(self, target, features, mask=None, clip_target=None, clip_features=None, dtype=None, **kwargs):
+    def __init__(self, target, features, mask=None, buffer_mask=False, mask_buffer_size=5, mask_buffer_passes=1, bands_first=False, clip_target=None, clip_features=None, dtype=None, **kwargs):
         assert target.shape == features.shape
         assert len(target.shape) == 3
         assert len(features.shape) == 3
@@ -19,6 +19,13 @@ class VPint2_interpolator():
             self.DTYPE = dtype
         else:
             self.DTYPE = np.float32
+
+        target = target.astype(self.DTYPE)
+        features = features.astype(self.DTYPE)
+
+        if(bands_first):
+            target = np.moveaxis(target, 0, -1)
+            features = np.moveaxis(features, 0, -1)
 
         # clip_target should be int, float (only max) or array-like with (min, max) values
         if(clip_target is not None):
@@ -41,6 +48,9 @@ class VPint2_interpolator():
             self.target = self.apply_mask(target, mask, **kwargs).astype(self.DTYPE)
         else:
             self.target = target.astype(self.DTYPE)
+
+        if(buffer_mask):
+            self.target = self.buffer_clouds(self.target, buffer_size=mask_buffer_size, passes=mask_buffer_passes)
 
         self.features = features.astype(self.DTYPE)
 
@@ -120,3 +130,21 @@ class VPint2_interpolator():
                     target_cloudy[i,j,:] = a
 
         return(target_cloudy)
+    
+
+    def buffer_clouds(self, target, buffer_size=5, passes=1):
+        img = target.copy()
+        for _ in range(0, passes):
+            new_img = target.copy()
+
+            for i in range(0, img.shape[0]):
+                for j in range(0, img.shape[1]):
+                    if(np.isnan(img[i,j,:]).any()):
+                        start_y = max(0, i-buffer_size)
+                        end_y = min(target.shape[0], i+buffer_size)
+                        start_x = max(0, j-buffer_size)
+                        end_x = min(target.shape[0], j+buffer_size)
+                        new_img[start_y:end_y, start_x:end_x, :] = np.nan
+            img = new_img
+
+        return(img)
