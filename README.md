@@ -3,7 +3,7 @@ This repository contains the code required to run VPint (value propagation-based
 
 ## Documentation
 
-The code contains docstraings with detailed explanations. We hope to move this documentation to ReadTheDocs when we can. 
+The code contains docstrings with detailed explanations. We hope to move this documentation to ReadTheDocs when we can. 
 
 ## Installation
 To install VPint (choose between requirements_slim.txt and requirements.txt based on desired level of optional functionalities):
